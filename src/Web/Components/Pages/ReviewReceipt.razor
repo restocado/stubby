@@ -3,7 +3,9 @@
 @using System.Globalization
 @using Mediator
 @using Stubby.Application.Features.Receipts.ApproveReceipt
+@using Stubby.Application.Features.Receipts.DeleteReceipt
 @using Stubby.Application.Features.Receipts.GetReceiptForReview
+@using Stubby.Application.Features.Receipts.ReprocessReceipt
 @using Stubby.Domain.Receipts
 @inject IMediator Sender
 @inject NavigationManager Navigation
@@ -49,7 +51,20 @@
         else if (isFailed)
         {
             <div class="alert alert-danger" role="alert">
-                Stubby could not read this receipt (@receipt.LastError). Enter the details yourself.
+                Stubby could not read this receipt (@receipt.LastError). Enter the details yourself, or try reading it again.
+            </div>
+            <div class="mb-3 d-flex flex-wrap align-items-center gap-2">
+                @if (_confirmingDelete)
+                {
+                    <span>Delete @TransactionNumber.Format(receipt.TransactionNo)?</span>
+                    <button type="button" class="btn btn-danger btn-sm" disabled="@_saving" @onclick="DeleteAsync">Yes, delete</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@_saving" @onclick="() => _confirmingDelete = false">Cancel</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-primary btn-sm" disabled="@_saving" @onclick="ReprocessAsync">Reprocess</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@_saving" @onclick="() => _confirmingDelete = true">Delete</button>
+                }
             </div>
         }
         else if (receipt.IsFlagged)
@@ -162,6 +177,7 @@
     private string? _saveError;
     private bool _conflict;
     private bool _saving;
+    private bool _confirmingDelete;
 
     [Parameter]
     public Guid Id { get; set; }
@@ -198,6 +214,64 @@
             Logger.LogError(ex, "Could not load receipt {Id}.", Id);
             _state = State.Failed;
         }
+    }
+
+    // A requeued receipt is Queued again, so it cannot be opened: go back to the list, where its progress shows.
+    private async Task ReprocessAsync()
+    {
+        await RunAsync(async () => await Sender.Send(new ReprocessReceiptCommand(Id)) switch
+        {
+            ReprocessReceiptResponse.Requeued => true,
+            ReprocessReceiptResponse.NotFound => FailWith(State.NotFound),
+            _ => FailWith("This receipt is no longer failed, so it was not requeued."),
+        });
+    }
+
+    private async Task DeleteAsync()
+    {
+        _confirmingDelete = false;
+        await RunAsync(async () => await Sender.Send(new DeleteReceiptCommand(Id)) switch
+        {
+            DeleteReceiptResponse.Deleted => true,
+            DeleteReceiptResponse.NotFound => FailWith(State.NotFound),
+            _ => FailWith("This receipt is still being read, so it cannot be deleted."),
+        });
+    }
+
+    // Runs an action that leaves this page when it works. A problem shows a short message and stays here.
+    private async Task RunAsync(Func<Task<bool>> action)
+    {
+        _saving = true;
+        _saveError = null;
+        _conflict = false;
+        try
+        {
+            if (await action())
+            {
+                Navigation.NavigateTo("receipts");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "A receipt action failed for {Id}.", Id);
+            _saveError = "That did not work. Try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private bool FailWith(State state)
+    {
+        _state = state;
+        return false;
+    }
+
+    private bool FailWith(string message)
+    {
+        _saveError = message;
+        return false;
     }
 
     private async Task ApproveAsync()

@@ -33,6 +33,24 @@ public interface IReceiptRepository
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Puts a Failed receipt back in the queue with a fresh set of attempts, in one transaction that locks the row and
+    /// checks the status again. <see cref="ReceiptWriteOutcome.Conflict"/> when it is not Failed.
+    /// </summary>
+    Task<ReceiptWriteOutcome> ReprocessAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Puts every Failed receipt back in the queue, in one transaction, so either all of them are requeued or none.
+    /// Other statuses are untouched. Returns how many there were, which may be zero.
+    /// </summary>
+    Task<int> ReprocessAllFailedAsync(DateTimeOffset now, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes a ForReview, Failed or Approved receipt, in one transaction that locks the row and checks the status
+    /// again. Field records are not touched. The stored file is not removed here: the caller does that after the commit.
+    /// </summary>
+    Task<ReceiptDeletion> DeleteAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Takes the oldest Queued receipt (by <c>CreatedAt</c>) and sets it Processing, in one transaction that
     /// locks the row and skips rows other callers hold. Returns null when nothing is Queued.
     /// </summary>

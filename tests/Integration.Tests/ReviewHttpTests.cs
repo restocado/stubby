@@ -237,6 +237,60 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
     }
 
     [Fact]
+    public async Task The_list_offers_each_receipt_only_the_actions_that_apply_to_it()
+    {
+        var forReview = await ReadAsync();
+        var approved = await ReadAsync();
+        await InScopeAsync(async sp => await sp.GetRequiredService<IMediator>().Send(
+            new ApproveReceiptCommand(approved, "Final Cafe", new DateOnly(2026, 10, 3), 13.00m, ReceiptCategory.Dining), Token));
+        Fixture.Extractor.Failure = new ExtractionException("The provider returned HTTP 503.");
+        var failed = await UploadAsync();
+        Assert.IsType<ProcessNextReceiptResult.Failed>(await ProcessOneAsync());
+        var queued = await UploadAsync();
+
+        var html = await GetPageAsync("/receipts");
+
+        Assert.Contains("Reprocess all failed", html, StringComparison.Ordinal);
+        var rows = html.Split("<tr>").Where(row => row.Contains("TXN-", StringComparison.Ordinal)).ToDictionary(row => RowNumber(row));
+        AssertActions(rows[await NumberAsync(forReview)], reprocess: false, delete: true);
+        AssertActions(rows[await NumberAsync(approved)], reprocess: false, delete: true);
+        AssertActions(rows[await NumberAsync(failed)], reprocess: true, delete: true);
+        AssertActions(rows[await NumberAsync(queued)], reprocess: false, delete: false);
+    }
+
+    [Fact]
+    public async Task Only_a_Failed_receipt_offers_reprocess_and_delete_on_its_review_page()
+    {
+        var forReview = await ReadAsync();
+        Fixture.Extractor.Failure = new ExtractionException("The provider returned HTTP 503.");
+        var failed = await UploadAsync();
+        Assert.IsType<ProcessNextReceiptResult.Failed>(await ProcessOneAsync());
+
+        var failedHtml = await GetPageAsync($"/receipts/{failed}");
+        var forReviewHtml = await GetPageAsync($"/receipts/{forReview}");
+
+        Assert.Contains(">Reprocess</button>", failedHtml, StringComparison.Ordinal);
+        Assert.Contains(">Delete</button>", failedHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Reprocess</button>", forReviewHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Delete</button>", forReviewHtml, StringComparison.Ordinal);
+    }
+
+    private async Task<string> NumberAsync(Guid id) => TransactionNumber.Format((await Fixture.ReloadAsync(id)).TransactionNo);
+
+    // The first cell of a list row is its transaction number, as text or as a link.
+    private static string RowNumber(string row)
+    {
+        var start = row.IndexOf("TXN-", StringComparison.Ordinal);
+        return row.Substring(start, row.IndexOf('<', start) - start).Trim();
+    }
+
+    private static void AssertActions(string row, bool reprocess, bool delete)
+    {
+        Assert.Equal(reprocess, row.Contains(">Reprocess</button>", StringComparison.Ordinal));
+        Assert.Equal(delete, row.Contains(">Delete</button>", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task The_list_links_only_the_receipts_that_can_be_opened()
     {
         var readable = await ReadAsync();

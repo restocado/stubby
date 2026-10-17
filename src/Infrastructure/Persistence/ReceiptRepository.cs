@@ -56,11 +56,7 @@ internal sealed class ReceiptRepository(IDbContextFactory<StubbyDbContext> dbFac
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        // The row lock makes a second approval, or a delete, of the same receipt wait for this transaction and
-        // then see its result, so a receipt cannot be approved twice.
-        var receipt = (await db.Receipts
-            .FromSql($"""SELECT * FROM "Receipts" WHERE "Id" = {id} FOR UPDATE""")
-            .ToListAsync(cancellationToken)).SingleOrDefault();
+        var receipt = await LockAsync(db, id, cancellationToken);
         if (receipt is null)
         {
             return ReceiptWriteOutcome.NotFound;
@@ -77,6 +73,80 @@ internal sealed class ReceiptRepository(IDbContextFactory<StubbyDbContext> dbFac
         await transaction.CommitAsync(cancellationToken);
         return ReceiptWriteOutcome.Done;
     }
+
+    public async Task<ReceiptWriteOutcome> ReprocessAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var receipt = await LockAsync(db, id, cancellationToken);
+        if (receipt is null)
+        {
+            return ReceiptWriteOutcome.NotFound;
+        }
+
+        if (receipt.Status != ReceiptStatus.Failed)
+        {
+            return ReceiptWriteOutcome.Conflict;
+        }
+
+        receipt.Reprocess(now);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return ReceiptWriteOutcome.Done;
+    }
+
+    public async Task<int> ReprocessAllFailedAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        // Locked, so a receipt cannot be deleted or approved while it is being requeued.
+        var failed = await db.Receipts
+            .FromSql($"""SELECT * FROM "Receipts" WHERE "Status" = 'Failed' FOR UPDATE""")
+            .ToListAsync(cancellationToken);
+
+        // The domain method makes the change, so the rule lives in one place.
+        foreach (var receipt in failed)
+        {
+            receipt.Reprocess(now);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return failed.Count;
+    }
+
+    public async Task<ReceiptDeletion> DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        var receipt = await LockAsync(db, id, cancellationToken);
+        if (receipt is null)
+        {
+            return new ReceiptDeletion(ReceiptWriteOutcome.NotFound);
+        }
+
+        // Queued and Processing receipts are being read, so they cannot be deleted.
+        if (!receipt.CanBeDeleted)
+        {
+            return new ReceiptDeletion(ReceiptWriteOutcome.Conflict);
+        }
+
+        // Only the row goes. Field records hold no link to the receipt, so they stay as they are.
+        db.Receipts.Remove(receipt);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new ReceiptDeletion(ReceiptWriteOutcome.Done, receipt.TransactionNo, receipt.ImagePath);
+    }
+
+    // The row lock makes a second change to the same receipt, such as another approval or a delete, wait for this
+    // transaction and then see its result, so a receipt cannot be approved twice or changed after it is deleted.
+    private static async Task<Receipt?> LockAsync(StubbyDbContext db, Guid id, CancellationToken cancellationToken) =>
+        (await db.Receipts
+            .FromSql($"""SELECT * FROM "Receipts" WHERE "Id" = {id} FOR UPDATE""")
+            .ToListAsync(cancellationToken)).SingleOrDefault();
 
     public async Task<Receipt?> ClaimNextQueuedAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {

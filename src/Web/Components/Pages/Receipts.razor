@@ -3,14 +3,27 @@
 @implements IDisposable
 @using System.Globalization
 @using Mediator
+@using Stubby.Application.Features.Receipts.DeleteReceipt
 @using Stubby.Application.Features.Receipts.ListReceipts
+@using Stubby.Application.Features.Receipts.ReprocessAllFailedReceipts
+@using Stubby.Application.Features.Receipts.ReprocessReceipt
 @using Stubby.Domain.Receipts
 @inject IMediator Sender
 @inject ILogger<Receipts> Logger
 
 <PageTitle>Receipts</PageTitle>
 
-<h1>Receipts</h1>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+    <h1 class="mb-0">Receipts</h1>
+    <button type="button" class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="ReprocessAllAsync">
+        Reprocess all failed
+    </button>
+</div>
+
+@if (_notice is not null)
+{
+    <div class="alert @(_noticeIsError ? "alert-danger" : "alert-success")" role="status">@_notice</div>
+}
 
 @if (_error is not null)
 {
@@ -45,6 +58,7 @@ else
                     <th>Date</th>
                     <th class="text-end">Total</th>
                     <th>Category</th>
+                    <th><span class="visually-hidden">Actions</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -74,6 +88,27 @@ else
                         <td class="text-nowrap">@item.ReceiptDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</td>
                         <td class="text-end text-nowrap">@item.Total?.ToString("F2", CultureInfo.InvariantCulture)</td>
                         <td>@item.Category?.ToString().ToLowerInvariant()</td>
+                        <td class="text-nowrap text-end">
+                            @if (_confirmingDelete == item.Id)
+                            {
+                                <span class="me-1">Delete @TransactionNumber.Format(item.TransactionNo)?</span>
+                                <button type="button" class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => DeleteAsync(item)">Yes, delete</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="CancelDelete">Cancel</button>
+                            }
+                            else
+                            {
+                                @if (item.Status == ReceiptStatus.Failed)
+                                {
+                                    <button type="button" class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="() => ReprocessAsync(item)">Reprocess</button>
+                                }
+
+                                @* Queued and Processing receipts have no delete action. *@
+                                @if (item.CanDelete)
+                                {
+                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick="() => AskDelete(item.Id)">Delete</button>
+                                }
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -99,8 +134,12 @@ else
     private readonly CancellationTokenSource _disposed = new();
     private ListReceiptsResponse? _response;
     private string? _error;
+    private string? _notice;
+    private bool _noticeIsError;
+    private Guid? _confirmingDelete;
     private int _page = 1;
     private bool _loading;
+    private bool _busy;
 
     [SupplyParameterFromQuery(Name = "page")]
     public int? PageNumber { get; set; }
@@ -163,6 +202,74 @@ else
         }
 
         StateHasChanged();
+    }
+
+    private async Task ReprocessAsync(ReceiptListItem item)
+    {
+        var number = TransactionNumber.Format(item.TransactionNo);
+        await RunAsync(
+            async () => await Sender.Send(new ReprocessReceiptCommand(item.Id)) switch
+            {
+                ReprocessReceiptResponse.Requeued => ($"{number} is back in the queue.", false),
+                ReprocessReceiptResponse.NotFound => ($"{number} no longer exists.", true),
+                _ => ($"{number} is no longer failed, so it was not requeued.", true),
+            },
+            $"Could not reprocess {number}. Try again.");
+    }
+
+    private async Task ReprocessAllAsync()
+    {
+        await RunAsync(
+            async () =>
+            {
+                var count = (await Sender.Send(new ReprocessAllFailedReceiptsCommand())).RequeuedCount;
+                return count switch
+                {
+                    0 => ("There are no failed receipts.", false),
+                    1 => ("1 receipt is back in the queue.", false),
+                    _ => ($"{count} receipts are back in the queue.", false),
+                };
+            },
+            "Could not reprocess the failed receipts. Try again.");
+    }
+
+    private void AskDelete(Guid id) => _confirmingDelete = id;
+
+    private void CancelDelete() => _confirmingDelete = null;
+
+    private async Task DeleteAsync(ReceiptListItem item)
+    {
+        var number = TransactionNumber.Format(item.TransactionNo);
+        _confirmingDelete = null;
+        await RunAsync(
+            async () => await Sender.Send(new DeleteReceiptCommand(item.Id)) switch
+            {
+                DeleteReceiptResponse.Deleted => ($"{number} was deleted.", false),
+                DeleteReceiptResponse.NotFound => ($"{number} no longer exists.", true),
+                _ => ($"{number} is still being read, so it cannot be deleted.", true),
+            },
+            $"Could not delete {number}. Try again.");
+    }
+
+    // Runs an action, shows what happened, and reloads the list. An exception shows a short message, never an error page.
+    private async Task RunAsync(Func<Task<(string Message, bool IsError)>> action, string failureMessage)
+    {
+        _busy = true;
+        try
+        {
+            (_notice, _noticeIsError) = await action();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "A receipt action failed.");
+            (_notice, _noticeIsError) = (failureMessage, true);
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        await LoadAsync();
     }
 
     private static string StatusText(ReceiptStatus status) =>

@@ -59,6 +59,55 @@ internal sealed class FakeReceiptRepository : IReceiptRepository
         return Task.FromResult(ReceiptWriteOutcome.Done);
     }
 
+    /// <summary>When set, <see cref="DeleteAsync"/> throws it, as a database failure would.</summary>
+    public Exception? ExceptionOnDelete { get; set; }
+
+    public Task<ReceiptWriteOutcome> ReprocessAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var receipt = Receipts.FirstOrDefault(r => r.Id == id);
+        if (receipt is null)
+        {
+            return Task.FromResult(ReceiptWriteOutcome.NotFound);
+        }
+
+        if (receipt.Status != ReceiptStatus.Failed)
+        {
+            return Task.FromResult(ReceiptWriteOutcome.Conflict);
+        }
+
+        receipt.Reprocess(now);
+        return Task.FromResult(ReceiptWriteOutcome.Done);
+    }
+
+    public Task<int> ReprocessAllFailedAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var failed = Receipts.Where(r => r.Status == ReceiptStatus.Failed).ToList();
+        failed.ForEach(r => r.Reprocess(now));
+        return Task.FromResult(failed.Count);
+    }
+
+    public Task<ReceiptDeletion> DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (ExceptionOnDelete is not null)
+        {
+            throw ExceptionOnDelete;
+        }
+
+        var receipt = Receipts.FirstOrDefault(r => r.Id == id);
+        if (receipt is null)
+        {
+            return Task.FromResult(new ReceiptDeletion(ReceiptWriteOutcome.NotFound));
+        }
+
+        if (!receipt.CanBeDeleted)
+        {
+            return Task.FromResult(new ReceiptDeletion(ReceiptWriteOutcome.Conflict));
+        }
+
+        Receipts.Remove(receipt);
+        return Task.FromResult(new ReceiptDeletion(ReceiptWriteOutcome.Done, receipt.TransactionNo, receipt.ImagePath));
+    }
+
     public Task<Receipt?> ClaimNextQueuedAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
         var next = Receipts
