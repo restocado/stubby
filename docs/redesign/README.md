@@ -61,10 +61,10 @@ Stubby has one person and one loop: **add receipts, check what was read, approve
 3. **Make the loop one tap at a time.** "Add receipts" is always in reach. Review ends in "Approve & next", so a pile is a loop, with no trip back to a list.
 4. **Give the receipt room.** The picture is large, with zoom, rotate and fit.
 5. **Say what happened in words, and what to do next.** A flag says why. A failure says whether the receipt is fine, and offers "Try reading again" first.
-6. **Phones are first-class.** Cards, not a table. A bottom tab bar with Add in the middle. Approve fixed to the bottom edge. Camera first.
+6. **Desktop leads, and phones still work.** Decided: receipts are mostly added and checked at a desk. So the desktop layouts are the detailed ones, with room for the picture and keyboard shortcuts for the review loop. Phones get cards and not a table, a bottom tab bar, Approve fixed to the bottom edge and a camera button, so that adding a receipt on the go works. Today's phone list is broken (see above), so this is a fix, not a feature.
 7. **Keep the risky things behind a menu and a confirmation**, with the consequence written out.
 
-**Navigation:** Inbox, Receipts, Add, Totals. A left rail on desktop and a bottom tab bar on a phone. The Inbox shows how many receipts are waiting.
+**Navigation:** Inbox, Receipts, Totals, and an "Add receipts" button. A left rail on desktop and a bottom tab bar on a phone. The Inbox shows how many receipts are waiting. The "Receipts" label stays as it is today (decided).
 
 ## What each wireframe needs
 
@@ -75,20 +75,24 @@ Some of this is only a different layout of what exists. Some needs new work behi
 | Inbox | Cards, stat tiles, "Try again" and "Type it in" (reprocess exists) | Counts by status; "approved this month" (reuses the totals query); thumbnails, with a first-page picture for a PDF |
 | Add receipts | Per-file rows with a thumbnail; "Go to inbox" | A camera-first button on phones; a real drop zone (the file input only accepts a drop on itself) |
 | All receipts | Row and card layouts; chips; the row menu | Search by merchant; filter by status and month; a count of all matching receipts; the same thumbnails |
-| Review | Category chips, date and total formats, the stuck-to-the-bottom Approve, "Show what was read" (the extracted values are already stored) | **Approve & next** and "1 of 3" (a query for the next receipt to review); a zoom, rotate and fit viewer, which is client-side work and different for a PDF |
+| Review | Category chips, date and total formats, the stuck-to-the-bottom Approve, "Show what was read" (the extracted values are already stored) | **Approve & next** and "1 of 3": a query for the receipts to review in `CreatedAt` order, oldest first, which is the order the worker reads them, and a way to skip one to the end of the round; keyboard shortcuts (off while a field has focus); a zoom, rotate and fit viewer, which is client-side work and different for a PDF |
 | Could not be read | Hiding the form until "Type it in myself" | Nothing |
 | Totals | Bars, hiding empty categories, a month picker | Comparison with last month; a 12-month strip; a link from a category to the receipts behind it (needs the category filter above) |
 | Small parts | Row menu, delete confirmation, empty state, approval message | Nothing |
 
-## Questions to settle before building
+## Decided
 
-1. **Phone first or desktop first?** The wireframes treat them equally. Which do you actually use more for adding, and which for reviewing?
-2. **How far from the template should it go?** Keep Bootstrap and restyle it (cheap), or a new look with its own brand and colours?
-3. **Names.** "Inbox" and "Receipts" are used here. Would you rather say "To review" and "All receipts", or something else?
-4. **Thumbnails.** Generate and store small ones (more files and a little work on upload), or scale the original in the browser (simpler, but heavier on the list and on phones)?
-5. **Totals extras.** Is the last-month comparison and the 12-month strip wanted, or should Totals stay minimal for now?
-6. **Approve & next.** Should it follow the order of the Inbox (oldest first, as the worker reads them), or newest first?
-7. **Anything missing?** For example editing an approved receipt's category is impossible today. If you want that, it is a rule change, not a layout one.
+- **Desktop leads.** It is used mostly at a desk. Phones still have to work.
+- **The "Receipts" label stays.** The Inbox is a new page beside it, not a rename of it.
+- **"Approve & next" goes oldest first**, the order the receipts were added and read, with "1 of 3" showing the place. A receipt can be skipped to the end of the round.
+
+## Still open
+
+1. **How far from the template should it go?** Keep Bootstrap and restyle it (cheap), or a new look with its own brand and colours?
+2. **The name "Inbox" for the new home page.** "Receipts" stays for the full list. Is "Inbox" right for the page of what needs attention, or would "To review" or "Home" suit better?
+3. **Thumbnails.** Generate and store small ones (more files and a little work on upload), or scale the original in the browser (simpler, but heavier on the list)?
+4. **Totals extras.** Is the last-month comparison and the 12-month strip wanted, or should Totals stay minimal for now?
+5. **Anything missing?** For example editing an approved receipt's category is impossible today. If you want that, it is a rule change, not a layout one.
 
 ## How these were made
 
