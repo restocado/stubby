@@ -3,13 +3,15 @@
 Date: 2026-10-18  
 Author: restocado
 
-Screenshots of the app as it is, an audit of what they show, and low-fidelity wireframes for a redesign. Nothing here changes the app. It is the material to decide from.
+Screenshots of the app as it is, an audit of what they show, and low-fidelity wireframes and high-fidelity mockups for a redesign. Nothing here changes the app. It is the material to decide from.
 
 | File | What it is |
 |---|---|
 | [`screenshots/`](screenshots/) | 12 desktop pages (1280 px wide) and 6 phone pages (390 px wide) of the running app |
 | [`wireframes.html`](wireframes.html) | Grey-box wireframes of 6 screens plus the small parts, each on desktop and on a phone. Open it in a browser. |
 | [`wireframes.png`](wireframes.png) | The same page as one long picture |
+| [`mockups.html`](mockups.html) | High-fidelity mockups of the same screens: desktop, phone, small parts and a style guide. Open it in a browser. |
+| [`mockups.png`](mockups.png) | The same page as one long picture |
 
 The screenshots show invented receipts only (NFR-D4). They were taken from a copy of the app running on a throwaway database, with its background worker idle, so nothing was sent to the model provider. The twelve receipts cover every status: five approved, four for review (two of them flagged, one a PDF), one failed, one queued and one processing.
 
@@ -57,11 +59,11 @@ These are in the app because of the rules, so the redesign has to respect them.
 Stubby has one person and one loop: **add receipts, check what was read, approve, see where the money went.** The wireframes are built around that loop, and around the two places it happens: a phone in your hand when you photograph a receipt, and a desk when you check them.
 
 1. **Open on the work, not on a menu.** The home page becomes an Inbox: what needs review, what failed, what is still being read, and this month's total.
-2. **Recognise a receipt the way you do.** A thumbnail, the merchant, the date and the amount lead everywhere. The transaction number and the file name are small and secondary.
+2. **Recognise a receipt the way you do.** The merchant, the date and the amount lead everywhere, with no thumbnails (decided). The transaction number and the file name are small and secondary.
 3. **Make the loop one tap at a time.** "Add receipts" is always in reach. Review ends in "Approve & next", so a pile is a loop, with no trip back to a list.
 4. **Give the receipt room.** The picture is large, with zoom, rotate and fit.
 5. **Say what happened in words, and what to do next.** A flag says why. A failure says whether the receipt is fine, and offers "Try reading again" first.
-6. **Desktop leads, and phones still work.** Decided: receipts are mostly added and checked at a desk. So the desktop layouts are the detailed ones, with room for the picture and keyboard shortcuts for the review loop. Phones get cards and not a table, a bottom tab bar, Approve fixed to the bottom edge and a camera button, so that adding a receipt on the go works. Today's phone list is broken (see above), so this is a fix, not a feature.
+6. **Desktop leads, and phones still work.** Decided: receipts are mostly added and checked at a desk. So the desktop layouts are the detailed ones, with room for the picture and keyboard shortcuts for the review loop. Phones get cards and not a table, a bottom tab bar with a raised Add button, Approve fixed to the bottom edge and a camera button, so that adding a receipt on the go works. Today's phone list is broken (see above), so this is a fix, not a feature.
 7. **Keep the risky things behind a menu and a confirmation**, with the consequence written out.
 
 **Navigation:** Inbox, Receipts, Totals, and an "Add receipts" button. A left rail on desktop and a bottom tab bar on a phone. The Inbox shows how many receipts are waiting. The "Receipts" label stays as it is today (decided).
@@ -72,9 +74,9 @@ Some of this is only a different layout of what exists. Some needs new work behi
 
 | Screen | Only layout | Needs something new |
 |---|---|---|
-| Inbox | Cards, stat tiles, "Try again" and "Type it in" (reprocess exists) | Counts by status; "approved this month" (reuses the totals query); thumbnails, with a first-page picture for a PDF |
-| Add receipts | Per-file rows with a thumbnail; "Go to inbox" | A camera-first button on phones; a real drop zone (the file input only accepts a drop on itself) |
-| All receipts | Row and card layouts; chips; the row menu | Search by merchant; filter by status and month; a count of all matching receipts; the same thumbnails |
+| Inbox | Cards, stat tiles, "Try again" and "Type it in" (reprocess exists) | Counts by status; "approved this month" (reuses the totals query) |
+| Add receipts | Per-file rows; "Go to inbox" | A camera-first button on phones; a real drop zone (the file input only accepts a drop on itself) |
+| All receipts | Row and card layouts; chips; the row menu | Search by merchant; filter by status and month; a count of all matching receipts |
 | Review | Category chips, date and total formats, the stuck-to-the-bottom Approve, "Show what was read" (the extracted values are already stored) | **Approve & next** and "1 of 3": a query for the receipts to review in `CreatedAt` order, oldest first, which is the order the worker reads them, and a way to skip one to the end of the round; keyboard shortcuts (off while a field has focus); a zoom, rotate and fit viewer, which is client-side work and different for a PDF |
 | Could not be read | Hiding the form until "Type it in myself" | Nothing |
 | Totals | Bars, hiding empty categories, a month picker | Comparison with last month; a 12-month strip; a link from a category to the receipts behind it (needs the category filter above) |
@@ -85,15 +87,15 @@ Some of this is only a different layout of what exists. Some needs new work behi
 - **Desktop leads.** It is used mostly at a desk. Phones still have to work.
 - **The "Receipts" label stays.** The Inbox is a new page beside it, not a rename of it.
 - **"Approve & next" goes oldest first**, the order the receipts were added and read, with "1 of 3" showing the place. A receipt can be skipped to the end of the round.
+- **No thumbnails.** A row is recognised by merchant, date and amount, and a PDF carries a small PDF tag. The wireframes still show thumbnail boxes because they were drawn first; the mockups follow this decision. Nothing needs to be generated or stored for it.
 
 ## Still open
 
 1. **How far from the template should it go?** Keep Bootstrap and restyle it (cheap), or a new look with its own brand and colours?
 2. **The name "Inbox" for the new home page.** "Receipts" stays for the full list. Is "Inbox" right for the page of what needs attention, or would "To review" or "Home" suit better?
-3. **Thumbnails.** Generate and store small ones (more files and a little work on upload), or scale the original in the browser (simpler, but heavier on the list)?
-4. **Totals extras.** Is the last-month comparison and the 12-month strip wanted, or should Totals stay minimal for now?
-5. **Anything missing?** For example editing an approved receipt's category is impossible today. If you want that, it is a rule change, not a layout one.
+3. **Totals extras.** Is the last-month comparison and the 12-month strip wanted, or should Totals stay minimal for now?
+4. **Anything missing?** For example editing an approved receipt's category is impossible today. If you want that, it is a rule change, not a layout one.
 
 ## How these were made
 
-Screenshots: `dotnet run` against a database made for the purpose, with seeded receipts, then headless Edge. The phone shots use a 390 px viewport set through Edge's remote debugging protocol, because headless Edge will not make a window narrower than 500 px and the first attempt only cropped a wider layout. The wireframes are plain HTML and CSS with no libraries.
+Screenshots: `dotnet run` against a database made for the purpose, with seeded receipts, then headless Edge. The phone shots use a 390 px viewport set through Edge's remote debugging protocol, because headless Edge will not make a window narrower than 500 px and the first attempt only cropped a wider layout. The wireframes and the mockups are plain HTML and CSS with a few lines of script (the mockups use it for the side rail and the tab bar), no libraries. The mockups show the invented receipts from `testset/`, and the figures on them (including the 12-month chart) are made up.
