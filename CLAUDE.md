@@ -4,7 +4,9 @@ Single-user .NET 10 Blazor app that reads receipts with a vision model. See [REA
 
 ## Status
 
-Scaffolded. `docs/` holds the design and `src/` holds empty projects wired per `docs/architecture.md`; no feature code yet. Only architecture tests exist in `tests/`. Build with `dotnet build Stubby.slnx`, test with `dotnet test --solution Stubby.slnx`.
+In progress. Built so far: upload, list receipts, the AI gateway, PDF rendering, the receipt extractor and the process-next-receipt slice. Not built: the extraction worker, review, approve, reprocess, delete, reports, and the eval tool. Build with `dotnet build Stubby.slnx`, test with `dotnet test --solution Stubby.slnx`.
+
+`tests/Integration.Tests` runs against a real PostgreSQL. It uses `postgres`/`postgres` on localhost, or the connection string in `STUBBY_TEST_PG` (it must be able to create databases). It creates and drops its own database, and skips when no server is reachable, so look for skipped tests in the summary.
 
 ## Source of truth
 

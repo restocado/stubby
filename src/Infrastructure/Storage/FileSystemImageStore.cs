@@ -26,17 +26,14 @@ internal sealed class FileSystemImageStore(string rootPath, ILogger<FileSystemIm
         return path;
     }
 
+    public Task<byte[]> ReadAsync(string path, CancellationToken cancellationToken) =>
+        File.ReadAllBytesAsync(Resolve(path), cancellationToken);
+
     public Task DeleteAsync(string path, CancellationToken cancellationToken)
     {
         try
         {
-            var fullPath = Path.GetFullPath(Path.Combine(_root, path));
-            if (!fullPath.StartsWith(_root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException("Path is outside the storage root.");
-            }
-
-            File.Delete(fullPath);
+            File.Delete(Resolve(path));
         }
         catch (Exception ex)
         {
@@ -44,6 +41,18 @@ internal sealed class FileSystemImageStore(string rootPath, ILogger<FileSystemIm
         }
 
         return Task.CompletedTask;
+    }
+
+    // The path comes from the database and is never trusted to stay inside the storage root.
+    private string Resolve(string path)
+    {
+        var fullPath = Path.GetFullPath(Path.Combine(_root, path));
+        if (!fullPath.StartsWith(_root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Path is outside the storage root.");
+        }
+
+        return fullPath;
     }
 
     private static string ExtensionFor(string contentType) => contentType switch

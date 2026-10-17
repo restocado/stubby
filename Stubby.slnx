@@ -9,6 +9,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Application.Tests/Stubby.Application.Tests.csproj" />
     <Project Path="tests/Architecture.Tests/Stubby.Architecture.Tests.csproj" />
+    <Project Path="tests/Integration.Tests/Stubby.Integration.Tests.csproj" />
     <Project Path="tests/Infrastructure.Tests/Stubby.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

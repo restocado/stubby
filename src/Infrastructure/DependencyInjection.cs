@@ -37,6 +37,10 @@ public static class DependencyInjection
 
         services.AddSingleton<IPdfRenderer>(new PdfToImageRenderer(pdfDpi));
         services.AddTransient<IReceiptExtractor, VisionReceiptExtractor>();
+
+        var extractionSettings = new ConfigurationExtractionSettings(configuration);
+        extractionSettings.Validate();
+        services.AddSingleton<IExtractionSettings>(extractionSettings);
         return services;
     }
 }
