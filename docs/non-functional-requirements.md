@@ -3,7 +3,7 @@
 Date: 2026-10-17  
 Author: restocado
 
-Status: accepted. Open questions at the end are still to be decided. Accuracy and performance targets come from [business-requirements.md](business-requirements.md).
+Status: accepted. Accuracy and performance targets come from [business-requirements.md](business-requirements.md).
 
 ## Performance
 
@@ -21,12 +21,13 @@ Status: accepted. Open questions at the end are still to be decided. Accuracy an
 | NFR-A1 | The total is extracted correctly on at least 90% of the 30 synthetic receipts. |
 | NFR-A2 | Merchant and date are correct on at least 85% of the same set. |
 | NFR-A3 | Of the receipts where the total is wrong, at least 95% are flagged for review instead of being saved silently. |
+| NFR-A4 | A receipt is flagged for review if any of these is true: the total is missing, zero or negative; the total is at or above a limit set in the app settings (3000 to start with); the receipt shows both a subtotal and a tax and the subtotal plus tax does not equal the total; or the date is missing, in the future, or more than a year old. Receipts without a tax skip the subtotal check. Subtotal and tax are used only for this check and are not stored. |
 
 ## Reliability
 
 | ID | Requirement |
 |---|---|
-| NFR-R1 | A failed extraction is retried automatically, up to 3 attempts in total per receipt. After that the receipt becomes Failed. |
+| NFR-R1 | The maximum number of extraction attempts per receipt is a setting, 1 to start with. A failed extraction is retried automatically until that number of attempts in total is used. After that the receipt becomes Failed. With the default of 1, there is no automatic retry. |
 | NFR-R2 | A receipt is never lost. Queued and Processing receipts survive an app restart and continue processing. |
 | NFR-R3 | If the vision model provider is unavailable, receipts use up their attempts and become Failed. The user can reprocess them, one by one or all at once, once the provider is back. The app keeps working and shows no unhandled errors. |
 | NFR-R4 | An approved receipt cannot be edited by any path in the app. It can only be deleted. |
@@ -44,10 +45,11 @@ Status: accepted. Open questions at the end are still to be decided. Accuracy an
 
 | ID | Requirement |
 |---|---|
-| NFR-D1 | Every correction made on the review screen is stored with the before and after values, so a before/after accuracy report can be generated. |
-| NFR-D2 | When a receipt is deleted, its corrections are kept as anonymous records: field name, extracted value, corrected value, timestamp, and model and prompt version. The image and any link to the receipt are deleted. |
+| NFR-D1 | When a receipt is approved, every extracted field is stored with its before and after values, including fields the user did not change, so a before/after accuracy rate can be generated. |
+| NFR-D2 | When a receipt is deleted, its field records are kept as anonymous records: field name, extracted value, final value, timestamp, and model and prompt version. The image and any link to the receipt are deleted. |
 | NFR-D3 | The CSV export contains approved receipts only, and opens correctly in Excel. |
 | NFR-D4 | Only fake or synthetic receipts are used in the demo. No real personal or financial data is stored. |
+| NFR-D5 | Details entered by hand on a Failed receipt are tagged as manual and excluded from all accuracy numbers. |
 
 ## Security and privacy
 
