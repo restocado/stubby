@@ -1,7 +1,7 @@
 # AI Gateway
 
 **Status:** Draft  
-**Location:** `Infrastructure/AiGateway/`: `AiGateway`, `OllamaCloudAdapter` (behind an internal `IAiProviderAdapter`), `AiGatewayOptions`, `AiGatewayRegistration`. `IAiGateway`, `AiRequest` and `AiGatewayException` in `Application/Abstractions/`.  
+**Location:** `Infrastructure/AiGateway/`: `AiGateway`, `OllamaCloudAdapter` (behind an internal `IAiProviderAdapter`), `AiGatewayOptions`, `AiGatewayRegistration`. `IAiGateway` (which also exposes the configured `Model`, so the extractor can record it), `AiRequest` and `AiGatewayException` in `Application/Abstractions/`.  
 **Depends on:** nothing.
 
 ## Scope
