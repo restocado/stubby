@@ -12,9 +12,13 @@ Author: restocado
 5. As a user, I want to open a receipt that is ready and see the image beside the extracted merchant, date and total, so that I can check what Stubby picked up.
 6. As a user, I want to correct any detail and pick a category, so that the receipt is accurate before it is saved.
 7. As a user, I want to enter the details myself when Stubby could not read a receipt, so that I don't lose it.
-8. As a user, I want to approve a receipt, so that it counts toward my monthly totals.
-9. As a user, I want to see my monthly totals by category, so that I know where my money went.
-10. As a user, I want to export my data as a CSV, so that I can use it elsewhere.
+8. As a user, I want to send a failed receipt back to be processed again, so that I can try again without uploading the file a second time.
+9. As a user, I want to reprocess all my failed receipts at once, so that I can recover quickly after the provider was down.
+10. As a user, I want the upload to fail when I upload a file I already uploaded, whether or not it is approved, so that I don't count the same receipt twice.
+11. As a user, I want to approve a receipt, so that it counts toward my monthly totals.
+12. As a user, I want to see my monthly totals by category, so that I know where my money went.
+13. As a user, I want to delete a receipt, so that I can remove mistakes and upload the file again.
+14. As a user, I want to export my data as a CSV, so that I can use it elsewhere.
 
 ## User flow
 
@@ -23,10 +27,16 @@ flowchart LR
     A[Upload a receipt] --> V{Supported<br/>file type?}
     V -- No --> X[See an error]
     X --> A
-    V -- Yes --> L[Open the receipts list]
+    V -- Yes --> D{Already<br/>uploaded?}
+    D -- Yes --> X
+    D -- No --> L[Open the receipts list]
     L --> O[Open a receipt<br/>that is ready]
     O --> R[Review the details<br/>confirm or correct<br/>pick a category]
     R --> P[Receipt approved]
     P --> M[See monthly totals<br/>by category]
     M --> E[Export CSV]
+    L --> DEL[Delete a receipt]
+    DEL --> L
+    L --> RQ[Reprocess a failed receipt<br/>or all failed receipts]
+    RQ --> L
 ```
