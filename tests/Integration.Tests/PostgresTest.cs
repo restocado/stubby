@@ -1,5 +1,7 @@
+using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Stubby.Application.Abstractions;
+using Stubby.Application.Features.Receipts.UploadReceipt;
 using Stubby.Domain.Receipts;
 
 namespace Stubby.Integration.Tests;
@@ -9,6 +11,7 @@ namespace Stubby.Integration.Tests;
 public abstract class PostgresTest(PostgresFixture fixture) : IAsyncLifetime
 {
     private int _next;
+    private int _uploads;
 
     protected PostgresFixture Fixture => fixture;
 
@@ -20,7 +23,7 @@ public abstract class PostgresTest(PostgresFixture fixture) : IAsyncLifetime
         await fixture.ResetAsync();
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public virtual ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>Runs <paramref name="action"/> in its own DI scope, as a request or a worker call would.</summary>
     protected async Task<T> InScopeAsync<T>(Func<IServiceProvider, Task<T>> action)
@@ -31,6 +34,15 @@ public abstract class PostgresTest(PostgresFixture fixture) : IAsyncLifetime
 
     protected Task<bool> TryAddAsync(Receipt receipt) =>
         InScopeAsync(sp => sp.GetRequiredService<IReceiptRepository>().TryAddAsync(receipt, Token));
+
+    /// <summary>Uploads a small PNG with bytes of its own through the real upload handler. Returns the new receipt's id.</summary>
+    protected async Task<Guid> UploadAsync()
+    {
+        byte[] content = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, (byte)Interlocked.Increment(ref _uploads)];
+        var response = await InScopeAsync(async sp => await sp.GetRequiredService<IMediator>().Send(
+            new UploadReceiptCommand("receipt.png", "image/png", content.Length, new MemoryStream(content)), Token));
+        return Assert.IsType<UploadReceiptResponse.Created>(response).Id;
+    }
 
     /// <summary>Adds a Queued receipt created <paramref name="minutesOld"/> minutes ago, with a checksum of its own.</summary>
     protected async Task<Receipt> AddQueuedAsync(int minutesOld = 0, string? checksum = null)

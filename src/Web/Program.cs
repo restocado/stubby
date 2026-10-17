@@ -2,6 +2,7 @@ using Stubby.Application;
 using Stubby.Infrastructure;
 using Stubby.Infrastructure.Persistence;
 using Stubby.Web.Components;
+using Stubby.Web.Workers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +10,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSingleton(ExtractionWorkerOptions.From(builder.Configuration));
+builder.Services.AddHostedService<ExtractionWorker>();
 
 var app = builder.Build();
 

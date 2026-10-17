@@ -38,6 +38,13 @@ internal sealed class FakeReceiptRepository : IReceiptRepository
         return Task.FromResult(next);
     }
 
+    public Task<int> RequeueInterruptedAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var processing = Receipts.Where(r => r.Status == ReceiptStatus.Processing).ToList();
+        processing.ForEach(r => r.ReturnToQueue(now));
+        return Task.FromResult(processing.Count);
+    }
+
     /// <summary>The fake hands out the stored instances, so changes are already saved. This counts the saves.</summary>
     public int Saves { get; private set; }
 

@@ -9,6 +9,8 @@ namespace Stubby.Infrastructure.Persistence;
 internal sealed class ReceiptRepository(IDbContextFactory<StubbyDbContext> dbFactory) : IReceiptRepository
 {
     private const string ChecksumIndex = "IX_Receipts_Checksum";
+    private const int MaxClaimAttempts = 5;
+    private static readonly TimeSpan ClaimRetryDelay = TimeSpan.FromMilliseconds(25);
 
     public async Task<long?> FindTransactionNoByChecksumAsync(string checksum, CancellationToken cancellationToken)
     {
@@ -42,6 +44,31 @@ internal sealed class ReceiptRepository(IDbContextFactory<StubbyDbContext> dbFac
 
     public async Task<Receipt?> ClaimNextQueuedAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
+        // The claim can come back empty while Queued receipts remain. If another caller commits the row this
+        // one picked before the lock is taken, the row fails the re-check and LIMIT 1 is not refilled. So an
+        // empty result is checked against the queue, and tried again a few times while something is still Queued.
+        for (var attempt = 0; attempt < MaxClaimAttempts; attempt++)
+        {
+            var claimed = await TryClaimOnceAsync(now, cancellationToken);
+            if (claimed is not null)
+            {
+                return claimed;
+            }
+
+            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            if (!await db.Receipts.AnyAsync(r => r.Status == ReceiptStatus.Queued, cancellationToken))
+            {
+                return null;
+            }
+
+            await Task.Delay(ClaimRetryDelay, cancellationToken);
+        }
+
+        return null;
+    }
+
+    private async Task<Receipt?> TryClaimOnceAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
@@ -65,6 +92,23 @@ internal sealed class ReceiptRepository(IDbContextFactory<StubbyDbContext> dbFac
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return claimed;
+    }
+
+    public async Task<int> RequeueInterruptedAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var processing = await db.Receipts
+            .Where(r => r.Status == ReceiptStatus.Processing)
+            .ToListAsync(cancellationToken);
+
+        // The domain method makes the change, so the rule lives in one place. SaveChanges is one transaction.
+        foreach (var receipt in processing)
+        {
+            receipt.ReturnToQueue(now);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return processing.Count;
     }
 
     public async Task SaveAsync(Receipt receipt, CancellationToken cancellationToken)
