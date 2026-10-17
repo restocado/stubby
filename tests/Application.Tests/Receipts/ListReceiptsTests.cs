@@ -1,4 +1,5 @@
 using FluentValidation;
+using Stubby.Application.Abstractions;
 using Stubby.Application.Features.Receipts.ListReceipts;
 using Stubby.Domain.Receipts;
 
@@ -185,6 +186,67 @@ public class ListReceiptsTests
 
         Assert.Equal([3L, 2L, 1L], response.Items.Select(i => i.TransactionNo));
         Assert.All(response.Items, i => Assert.EndsWith(".png", i.OriginalFileName, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task The_filter_is_passed_to_the_repository_with_the_search_trimmed()
+    {
+        await _handler.Handle(
+            new ListReceiptsQuery(1, "  cafe ", ReceiptStatusFilter.Approved, 2026, 9, ReceiptCategory.Dining),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            new ReceiptFilter("cafe", ReceiptStatusFilter.Approved, 2026, 9, ReceiptCategory.Dining),
+            _receipts.LastFilter);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task A_blank_search_means_no_search(string? search)
+    {
+        await _handler.Handle(new ListReceiptsQuery(1, search), TestContext.Current.CancellationToken);
+
+        Assert.Null(_receipts.LastFilter!.Search);
+    }
+
+    [Fact]
+    public async Task Only_the_receipts_that_match_are_listed_and_counted()
+    {
+        await Add(ForReview(1, isFlagged: false));
+        var approved = ForReview(2, isFlagged: false);
+        approved.Approve("Final Cafe", FinalDate, 13.00m, ReceiptCategory.Dining, Start);
+        await Add(approved);
+        await Add(Queued(3));
+
+        var response = await _handler.Handle(
+            new ListReceiptsQuery(1, Status: ReceiptStatusFilter.Approved), TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, response.TotalCount);
+        Assert.Equal(1, response.PageCount);
+        Assert.Equal(ReceiptStatus.Approved, Assert.Single(response.Items).Status);
+    }
+
+    [Fact]
+    public async Task A_search_that_is_too_long_fails_validation()
+    {
+        var search = new string('a', ListReceiptsQuery.MaxSearchLength + 1);
+
+        await Assert.ThrowsAsync<ValidationException>(
+            async () => await _handler.Handle(new ListReceiptsQuery(1, search), TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData(2026, null)]
+    [InlineData(null, 9)]
+    [InlineData(2026, 13)]
+    [InlineData(2026, 0)]
+    [InlineData(0, 9)]
+    public async Task A_month_needs_its_year_and_both_must_exist(int? year, int? month)
+    {
+        await Assert.ThrowsAsync<ValidationException>(
+            async () => await _handler.Handle(new ListReceiptsQuery(1, Year: year, Month: month), TestContext.Current.CancellationToken));
     }
 
     private async Task<List<Receipt>> AddQueued(int count)

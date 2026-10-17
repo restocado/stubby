@@ -52,4 +52,20 @@ internal sealed class ReportReader(IDbContextFactory<StubbyDbContext> dbFactory)
             .Select(r => new ApprovedReceiptRow(r.TransactionNo, r.ReceiptDate!.Value, r.Merchant!, r.Category!.Value, r.Total!.Value))
             .ToList();
     }
+
+    public async Task<IReadOnlyList<MonthSum>> GetMonthlySumsAsync(YearMonth from, YearMonth to, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var first = new DateOnly(from.Year, from.Month, 1);
+        var next = new DateOnly(to.Year, to.Month, 1).AddMonths(1);
+        var sums = await db.Receipts
+            .AsNoTracking()
+            .Where(r => r.Status == ReceiptStatus.Approved && r.ReceiptDate >= first && r.ReceiptDate < next)
+            .GroupBy(r => new { r.ReceiptDate!.Value.Year, r.ReceiptDate!.Value.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, Total = g.Sum(r => r.Total) ?? 0m })
+            .ToListAsync(cancellationToken);
+
+        return sums.Select(s => new MonthSum(new YearMonth(s.Year, s.Month), s.Total)).ToList();
+    }
 }
