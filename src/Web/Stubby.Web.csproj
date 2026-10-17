@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>stubby-web-6d1f2a54-8b3e-4c7a-9f10-2e5b7c3d4a98</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
