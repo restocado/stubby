@@ -1,0 +1,17 @@
+# Extraction Module : Open Decisions
+
+**Status:** Draft
+
+None are decided until the author confirms them.
+
+| # | Question | Blocks | Recommendation |
+|---|---|---|---|
+| 1 | What are the exact prompt and reply format? Neither is written yet. | 02, 05 | JSON with fixed field names, `null` for unreadable fields, `yyyy-MM-dd` dates, no currency symbol. Write the prompt as its own design note. |
+| 2 | Does a call over the rate limit wait or fail fast? | 01 | Wait, up to the timeout. |
+| 3 | What are the default timeout, rate limit and circuit breaker values? | 01 | Pick starting values in settings and tune from the usage logs. A PDF needs a longer timeout than a photo. |
+| 4 | Is one unparseable field a missing field or a failed reply? | 02 | Missing field. Fail only when nothing is usable. |
+| 5 | What DPI for PDF pages? | 03 | About 150 to 200, checked on the eval set. |
+| 6 | Which time zone defines "today" for the date flags? | 04, 05 | The server's local date. |
+| 7 | In what order are requeued receipts processed? | 05 | By `CreatedAt`. Revisit if "reprocess all" delays new uploads. |
+| 8 | Is `MaxAttempts` re-read on every call or only at startup? | 05, 06 | Every call. |
+| 9 | Should the worker pause while the circuit is open? | 06 | No, as decided in the architecture. Watch the usage logs. |

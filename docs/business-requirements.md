@@ -13,13 +13,13 @@ Take a photo of a receipt, check the details Stubby picked up, and see where thi
 
 ## How it works
 
-1. Upload a receipt image (JPG, PNG, or PDF). Any other file type is rejected with an error and never queued. A file whose checksum matches an existing receipt, approved or not, is a duplicate: the upload fails with an error and the file is never queued. The receipt is added to the processing queue automatically with the status Queued.
+1. Upload a receipt image (JPG, PNG, or PDF). Any other file type is rejected with an error and never queued. A file whose checksum matches an existing receipt, approved or not, is a duplicate: the upload fails with an error that shows the transaction number of the existing receipt, and the file is never queued. The receipt is added to the processing queue automatically with the status Queued, and the system gives it a transaction number.
 2. A background job picks up the receipt (status Processing) and sends the image, or every page of a PDF, to the vision model, which fills in the merchant, date, and total. When the receipt shows a subtotal and a tax, they are read too, but only to check the total. They are not stored or shown. While the receipt is Queued or Processing the user cannot open it. The user can keep uploading other receipts.
 3. When extraction works, the receipt becomes For review, and it is flagged if the total looks wrong. If extraction does not work, the receipt is put back in the queue and retried automatically until the maximum number of attempts per receipt is used. That maximum is a setting, 1 to start with, which means no automatic retry. When the last attempt fails, the receipt becomes Failed.
-4. A receipts list shows all receipts, newest first, with their status (Queued, Processing, Failed, For review, Approved). The user opens a For review or Failed receipt from this list.
+4. A receipts list shows all receipts, newest first, with their transaction number and status (Queued, Processing, Failed, For review, Approved). The user opens a For review or Failed receipt from this list.
 5. A review screen shows the receipt beside the extracted fields. The user confirms or corrects them and picks the category from a fixed list: groceries, dining, transport, utilities, shopping, health, entertainment, other. For a Failed receipt the user enters the details manually.
 6. Approved receipts feed monthly totals by category, with CSV export. Approved receipts can be viewed from the list but can never be edited.
-7. The user can delete a receipt that is For review, Failed or Approved. Deleting removes the receipt and its image for good. The field records from its review are kept without any link to the receipt, so the accuracy report stays complete. Deleting also takes it out of the monthly totals if it was Approved, and allows the same file to be uploaded again. Queued and Processing receipts cannot be deleted.
+7. The user can delete a receipt that is For review, Failed or Approved. Deleting removes the receipt and its image for good. Its transaction number is never given to another receipt. The field records from its review are kept without any link to the receipt, so the accuracy report stays complete. Deleting also takes it out of the monthly totals if it was Approved, and allows the same file to be uploaded again. Queued and Processing receipts cannot be deleted.
 8. The user can reprocess a Failed receipt, or reprocess all Failed receipts at once. Each one goes back to Queued and gets a fresh set of attempts, up to the configured maximum. The user can also choose to enter the details manually instead.
 
 ## Receipt statuses
@@ -38,6 +38,10 @@ flowchart LR
     R --> A[Approved<br/>read-only, never editable]
     F --> A
 ```
+
+## Transaction number
+
+Every receipt gets a transaction number when it is uploaded. The system generates it, and the user cannot set or change it. Numbers form a series: whole numbers starting at 1, each higher than the one before. A number is never reused, even after the receipt is deleted, so gaps are possible. It stays the same through every status and reprocessing. The number is shown to the user as `TXN-` followed by the number padded to six digits, for example `TXN-000042`. After `TXN-999999` the digits simply grow (`TXN-1000000`). The number is shown in the receipts list and on the review screen, and is included in the CSV export in the same form. The anonymous field records do not hold it.
 
 ## Users
 

@@ -34,6 +34,7 @@ flowchart LR
 | First vision model: gemma4:31b on Ollama Cloud, set in app settings | It accepts images, unlike gpt-oss, which is text-only. The model name is configuration, so it can be changed without a code change. Each change should be checked by rerunning the 30-receipt eval set (NFR-M3). |
 | PDFs rendered to images with PDFtoImage (MIT, targets .NET 10) | The vision model accepts only images. PDFtoImage renders each page to PNG. Its native PDFium engine is not thread-safe, so rendering needs a lock if more than one worker is ever used. |
 | Money stored as exact decimals | No rounding drift in monthly totals. |
+| Transaction number from a PostgreSQL identity column | The database hands out the next number safely under concurrent uploads and never reuses one (NFR-D6). No counter in application code. |
 | Clean Architecture, one feature slice per command or query | Matches the user stories. |
 | Extraction behind a receipt extractor, which calls an AI gateway | Prompt and parsing are separate from provider access. Changing provider touches only an adapter (NFR-M2). |
 | The gateway does not retry; the worker owns the attempt budget, a setting that starts at 1 | Two retry layers would multiply the attempts and break the configured total (NFR-R1). Starting at 1 means no automatic retry, which limits token use. |
@@ -53,7 +54,7 @@ Dependencies point inward: Web and Infrastructure → Application → Domain. Th
 
 ## Main flows
 
-**Upload**: check size and file type, reject duplicates by checksum, store the file, add the receipt as Queued, return immediately (NFR-P2).
+**Upload**: check size and file type, reject duplicates by checksum (the error carries the existing receipt's transaction number), store the file, add the receipt as Queued with its next transaction number, return immediately (NFR-P2).
 
 **Processing**: the worker takes the oldest Queued receipt and sends all pages to the extractor. PDFs are rendered to images, every page. On success the receipt becomes For review, flagged if the checks fail. On failure it goes back to Queued while attempts remain, and when the configured maximum number of attempts (default 1) has failed it becomes Failed. With the default of 1, a failed extraction goes straight to Failed.
 
@@ -82,6 +83,7 @@ flowchart LR
   - The receipt shows both a subtotal and a tax, and subtotal plus tax does not equal the total. Receipts without tax skip this check.
   - The date is missing, in the future, or more than a year old.
 - **Field records** hold the before and after value, the model and the prompt version, with no link to the receipt (NFR-D1, D2). On approval a row is written for **every extracted field** (merchant, date and total), including unchanged ones where the two values are equal. This keeps the count of fields reviewed, so an accuracy rate can be computed even after receipts are deleted.
+- **Transaction number**: assigned by the database when the receipt row is inserted, never by the application, and never stored on field records, which must stay unlinked (NFR-D2).
 - **Manual entries** are tagged on the field record and excluded from accuracy numbers.
 - **Accuracy**:
   - The **eval tool** scores the 30 test receipts against known answers. Total and date must match exactly. Merchant matches after ignoring case, spacing and punctuation. Flag coverage is wrong totals that were flagged, divided by all wrong totals.
