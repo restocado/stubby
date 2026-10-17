@@ -3,83 +3,153 @@
 @using Mediator
 @using Stubby.Application.Abstractions
 @using Stubby.Application.Features.Reports.GetMonthlyTotals
+@using Stubby.Application.Features.Reports.GetTotalsTrend
 @inject IMediator Sender
 @inject TimeProvider Clock
 @inject ILogger<MonthlyTotals> Logger
 
-<PageTitle>Monthly totals</PageTitle>
+<PageTitle>Totals</PageTitle>
 
-<h1>Monthly totals</h1>
+<header class="page-head">
+    <div>
+        <h1>Totals</h1>
+        <p>Approved receipts only, by the date on the receipt.</p>
+    </div>
+    @if (_totals is not null)
+    {
+        <div class="head-controls">
+            <span class="switcher">
+                @if (_previous is { } previous)
+                {
+                    <a class="button square" href="@Link(previous)" rel="prev" aria-label="Previous month"><Icon Name="left" /></a>
+                }
+                else
+                {
+                    <span class="button square" aria-disabled="true"><Icon Name="left" /></span>
+                }
+                <strong class="month-name">@Format.Month(_totals.Year, _totals.Month)</strong>
+                @if (_next is { } next)
+                {
+                    <a class="button square" href="@Link(next)" rel="next" aria-label="Next month"><Icon Name="right" /></a>
+                }
+                else
+                {
+                    <span class="button square" aria-disabled="true"><Icon Name="right" /></span>
+                }
+            </span>
+            <a class="button" href="@($"api/reports/receipts.csv?year={_totals.Year}&month={_totals.Month}")"><Icon Name="download" />Export CSV</a>
+        </div>
+    }
+</header>
 
-@if (_totals is null)
+@if (_totals is null || _trend is null)
 {
-    <div class="alert alert-danger" role="alert">Could not load the totals. <a href="totals">Try again</a>.</div>
+    <div class="banner banner-fail" role="alert">Could not load the totals. <a href="totals">Try again</a>.</div>
 }
 else
 {
-    var month = new YearMonth(_totals.Year, _totals.Month);
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-        @if (_previous is { } previous)
-        {
-            <a class="btn btn-outline-secondary btn-sm" href="@Link(previous)" rel="prev">&larr; Previous</a>
-        }
-        else
-        {
-            <span class="btn btn-outline-secondary btn-sm disabled" aria-disabled="true">&larr; Previous</span>
-        }
+    var monthName = Format.Month(_totals.Year, _totals.Month);
+    var shown = _totals.Categories.Where(c => c.Count > 0 || _showEmpty).OrderByDescending(c => c.Total).ThenBy(c => c.Category).ToList();
+    var hidden = _totals.Categories.Count(c => c.Count == 0);
+    var top = shown.Count == 0 ? 0m : shown.Max(c => c.Total);
+    var chartMax = _trend.Months.Max(m => m.Total);
+    var monthQuery = $"{_totals.Year:D4}-{_totals.Month:D2}";
 
-        <strong class="px-2">@MonthName(month)</strong>
-
-        @if (_next is { } next)
-        {
-            <a class="btn btn-outline-secondary btn-sm" href="@Link(next)" rel="next">Next &rarr;</a>
-        }
-        else
-        {
-            <span class="btn btn-outline-secondary btn-sm disabled" aria-disabled="true">Next &rarr;</span>
-        }
-    </div>
-
-    <div class="table-responsive">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th>Category</th>
-                    <th class="text-end">Receipts</th>
-                    <th class="text-end">Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var category in _totals.Categories)
+    <div class="totals">
+        <section class="panel padded main-card">
+            <div class="muted label">Spent in @monthName</div>
+            <div class="headline">
+                <span class="grand num">@Format.Money(_totals.GrandTotal)</span>
+                @if (_trend.ChangePercent is { } change && change != 0m)
                 {
-                    <tr>
-                        <td>@category.Category.ToString().ToLowerInvariant()</td>
-                        <td class="text-end">@category.Count</td>
-                        <td class="text-end text-nowrap">@Money(category.Total)</td>
-                    </tr>
+                    <span class="chip @(change > 0 ? "chip-fail" : "chip-ok")" title="Compared with @PreviousName()">
+                        @(change > 0 ? "↑" : "↓") @Math.Abs(change).ToString("0.#", CultureInfo.InvariantCulture)% on @PreviousName()
+                    </span>
                 }
-            </tbody>
-            <tfoot>
-                <tr class="fw-bold">
-                    <td>Total</td>
-                    <td class="text-end">@_totals.GrandCount</td>
-                    <td class="text-end text-nowrap">@Money(_totals.GrandTotal)</td>
-                </tr>
-            </tfoot>
-        </table>
-    </div>
+            </div>
+            <p class="muted count-line">@Format.Receipts(_totals.GrandCount) approved</p>
 
-    <p class="d-flex flex-wrap gap-3">
-        <a href="@($"api/reports/receipts.csv?year={_totals.Year}&month={_totals.Month}")">Download @MonthName(month) as CSV</a>
-        <a href="api/reports/receipts.csv">Download every approved receipt as CSV</a>
-    </p>
-    <p class="text-muted">Only approved receipts count, by the date on the receipt.</p>
+            @if (_totals.GrandCount == 0 && !_showEmpty)
+            {
+                <div class="nothing">
+                    <p>Nothing approved in @monthName yet.</p>
+                    <a class="button" href="receipts?status=review">See receipts to review</a>
+                </div>
+            }
+            else
+            {
+                <div class="categories">
+                    @foreach (var category in shown)
+                    {
+                        <a class="category-row @(category.Count == 0 ? "none" : "")" href="receipts?status=approved&category=@Format.Category(category.Category)&month=@monthQuery"
+                           title="Show the @Format.Category(category.Category) receipts">
+                            <div class="between">
+                                <span class="name">
+                                    <i class="dot" style="--swatch: @Format.CategoryColor(category.Category)"></i>
+                                    <strong>@Format.Category(category.Category)</strong>
+                                    <span class="muted">@Format.Receipts(category.Count)</span>
+                                </span>
+                                <span><strong class="num">@Format.Money(category.Total)</strong> <span class="muted num">@Share(category.Total)</span></span>
+                            </div>
+                            <div class="bar" style="--col: @Format.CategoryColor(category.Category)"><i style="width: @Width(category.Total, top)"></i></div>
+                        </a>
+                    }
+                </div>
+                @if (hidden > 0)
+                {
+                    <p class="muted hidden-note">
+                        @(hidden == 1 ? "1 category has" : $"{hidden} categories have") nothing in @monthName@(_showEmpty ? "." : hidden == 1 ? " and is hidden." : " and are hidden.")
+                        <a href="@(_showEmpty ? Link(new YearMonth(_totals.Year, _totals.Month)) : Link(new YearMonth(_totals.Year, _totals.Month)) + "&empty=1")">@(_showEmpty ? "Hide them" : "Show them")</a>
+                    </p>
+                }
+            }
+        </section>
+
+        <aside class="side">
+            <div class="panel padded">
+                <h2 class="section-title">Last 12 months</h2>
+                <div class="chart num" role="list">
+                    @foreach (var point in _trend.Months)
+                    {
+                        var isCurrent = point.Month.Year == _totals.Year && point.Month.Month == _totals.Month;
+                        <a class="column @(isCurrent ? "current" : "")" role="listitem" href="@Link(point.Month)"
+                           title="@Format.Month(point.Month.Year, point.Month.Month): @Format.Money(point.Total)"
+                           aria-label="@Format.Month(point.Month.Year, point.Month.Month): @Format.Money(point.Total)">
+                            <i style="height: @Height(point.Total, chartMax)"></i>
+                        </a>
+                    }
+                </div>
+                <div class="between muted axis">
+                    <span>@MonthShort(_trend.Months[0].Month)</span>
+                    <span>@MonthShort(_trend.Months[^1].Month)</span>
+                </div>
+            </div>
+
+            <div class="panel padded">
+                <div class="muted label">Average a month</div>
+                <div class="average num">@Format.Money(_trend.AveragePerMonth)</div>
+                <p class="muted">
+                    @(_trend.MonthsWithReceipts == 0
+                        ? "Nothing approved in the last 12 months."
+                        : $"Across the {(_trend.MonthsWithReceipts == 1 ? "1 month" : $"{_trend.MonthsWithReceipts} months")} with receipts, out of the last 12.")
+                </p>
+            </div>
+
+            <div class="panel padded downloads">
+                <div class="muted label">Download</div>
+                <a href="@($"api/reports/receipts.csv?year={_totals.Year}&month={_totals.Month}")"><Icon Name="download" Class="small" />@monthName as CSV</a>
+                <a href="api/reports/receipts.csv"><Icon Name="download" Class="small" />Every approved receipt as CSV</a>
+            </div>
+        </aside>
+    </div>
 }
 
 @code {
     private GetMonthlyTotalsResponse? _totals;
+    private GetTotalsTrendResponse? _trend;
     private YearMonth? _previous;
     private YearMonth? _next;
+    private bool _showEmpty;
 
     // Text, and parsed here: a value such as "abc" cannot be bound to a number, and the binding would throw.
     [SupplyParameterFromQuery(Name = "year")]
@@ -88,10 +158,14 @@ else
     [SupplyParameterFromQuery(Name = "month")]
     public string? MonthText { get; set; }
 
+    [SupplyParameterFromQuery(Name = "empty")]
+    public string? EmptyText { get; set; }
+
     protected override async Task OnParametersSetAsync()
     {
         var now = Clock.GetLocalNow();
         var current = new YearMonth(now.Year, now.Month);
+        _showEmpty = EmptyText == "1";
 
         // A missing or impossible month shows the current one.
         var requested =
@@ -103,34 +177,43 @@ else
         try
         {
             _totals = await Sender.Send(new GetMonthlyTotalsQuery(requested.Year, requested.Month));
+            _trend = await Sender.Send(new GetTotalsTrendQuery(requested.Year, requested.Month));
 
             // The months that can be picked run from the first approved receipt to the current month. A receipt dated
             // after the current month, which approval allows, extends the range to its month.
-            var first = _totals.EarliestMonth is { } earliest && Compare(earliest, current) < 0 ? earliest : current;
-            var last = _totals.LatestMonth is { } latest && Compare(latest, current) > 0 ? latest : current;
-            _previous = Compare(requested, first) > 0 ? AddMonths(requested, -1) : null;
-            _next = Compare(requested, last) < 0 ? AddMonths(requested, 1) : null;
+            var first = _totals.EarliestMonth is { } earliest && earliest.CompareTo(current) < 0 ? earliest : current;
+            var last = _totals.LatestMonth is { } latest && latest.CompareTo(current) > 0 ? latest : current;
+            _previous = requested.CompareTo(first) > 0 ? requested.AddMonths(-1) : null;
+            _next = requested.CompareTo(last) < 0 ? requested.AddMonths(1) : null;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Could not load the totals for {Year}-{Month}.", requested.Year, requested.Month);
             _totals = null;
+            _trend = null;
         }
-    }
-
-    private static int Compare(YearMonth a, YearMonth b) => ((a.Year * 12) + a.Month).CompareTo((b.Year * 12) + b.Month);
-
-    private static YearMonth AddMonths(YearMonth month, int months)
-    {
-        var index = (month.Year * 12) + (month.Month - 1) + months;
-        return new YearMonth(index / 12, (index % 12) + 1);
     }
 
     private static string Link(YearMonth month) => $"totals?year={month.Year}&month={month.Month}";
 
-    private static string MonthName(YearMonth month) =>
-        new DateTime(month.Year, month.Month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+    private string PreviousName()
+    {
+        var previous = new YearMonth(_totals!.Year, _totals.Month).AddMonths(-1);
+        return new DateTime(Math.Max(previous.Year, 1), previous.Month, 1).ToString("MMMM", CultureInfo.InvariantCulture);
+    }
 
-    // Two decimals and no currency symbol: no currency is stored.
-    private static string Money(decimal amount) => amount.ToString("F2", CultureInfo.InvariantCulture);
+    private static string MonthShort(YearMonth month) =>
+        new DateTime(Math.Max(month.Year, 1), month.Month, 1).ToString("MMM yyyy", CultureInfo.InvariantCulture);
+
+    private string Share(decimal amount) =>
+        _totals!.GrandTotal <= 0m
+            ? string.Empty
+            : $"{Math.Round(amount / _totals.GrandTotal * 100m, 0, MidpointRounding.AwayFromZero).ToString("0", CultureInfo.InvariantCulture)}%";
+
+    private static string Width(decimal amount, decimal max) =>
+        (max <= 0m ? 0m : Math.Round(amount / max * 100m, 1)).ToString("0.#", CultureInfo.InvariantCulture) + "%";
+
+    // A month with something in it always shows a sliver, so it is not mistaken for an empty one.
+    private static string Height(decimal amount, decimal max) =>
+        (amount <= 0m || max <= 0m ? 0m : Math.Max(Math.Round(amount / max * 100m, 1), 2m)).ToString("0.#", CultureInfo.InvariantCulture) + "%";
 }

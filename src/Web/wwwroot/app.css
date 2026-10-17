@@ -1,5 +1,21 @@
 /* Stubby design system: tokens, base, shell and the shared pieces. Page-specific styles live beside each page. */
 
+/* ---------- the few browser defaults the design relies on ---------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body { margin: 0; }
+
+h1, h2, h3, h4 { margin: 0 0 .5rem; line-height: 1.2; }
+p { margin-top: 0; margin-bottom: 1rem; }
+dl, dd { margin: 0; }
+img, svg { vertical-align: middle; }
+button, input, select { font-family: inherit; }
+[hidden] { display: none !important; }
+
+
 :root {
     --bg: #f4f2ed;
     --surface: #fff;
@@ -585,4 +601,43 @@ h1:focus { outline: none; }
     font-weight: 800;
     letter-spacing: .04em;
     vertical-align: 1px;
+}
+
+/* ---------- focus layout ---------- */
+
+.focus { max-width: 1400px; margin: 0 auto; padding: 16px 24px 20px; }
+
+@media (max-width: 899.98px) {
+    .focus { padding: 0; }
+}
+
+/* ---------- Blazor's unhandled-error bar (hidden until Blazor shows it) ---------- */
+
+#blazor-error-ui {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+    display: none;
+    padding: 0.6rem 1.25rem 0.7rem;
+    background: lightyellow;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    color-scheme: light only;
+    color: #1c2230;
+}
+
+#blazor-error-ui .dismiss { position: absolute; top: 0.5rem; right: 0.75rem; cursor: pointer; }
+
+/* Text for screen readers only: a page needs a heading even where the design shows none. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }

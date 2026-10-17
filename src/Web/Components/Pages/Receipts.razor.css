@@ -1,0 +1,98 @@
+.head-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+.filters .search { width: 320px; }
+.active-filter { height: 32px; text-decoration: none; }
+
+.list { overflow: visible; }
+
+.line {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) 112px 150px 160px 104px 40px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--line);
+}
+
+.line:hover { background: #f9faf8; }
+.line.menu-open { position: relative; z-index: 2; background: #f7faf9; }
+
+.line.head {
+    padding-block: 11px;
+    border-radius: var(--radius) var(--radius) 0 0;
+    background: #faf9f6;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.line.head:hover { background: #faf9f6; }
+.right, .total { text-align: right; }
+
+.name { display: block; overflow: hidden; color: var(--ink); font-weight: 650; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+a.name:hover { color: var(--brand); text-decoration: underline; }
+.sub { font-size: 12px; }
+.total { font-size: 16px; font-weight: 700; }
+
+.category-link { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; }
+.category-link:hover { text-decoration: underline; }
+
+.actions { position: relative; justify-self: end; }
+
+.more {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.more:hover, .menu-open .more { background: #eceae3; color: var(--ink); }
+
+.pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 18px;
+    border-radius: 0 0 var(--radius) var(--radius);
+    background: #faf9f6;
+}
+
+.pager-links { display: flex; gap: 8px; }
+.doomed { margin-bottom: 6px; }
+.doomed + p { margin: 0; font-size: 13px; }
+
+@media (max-width: 899.98px) {
+    .head-actions a.button.primary { display: none; }
+    .filters .search { width: 100%; }
+    .filters { overflow-x: auto; }
+    .segmented { overflow-x: auto; max-width: 100%; }
+
+    .line.head { display: none; }
+
+    /* A card: the merchant and total on top, the date, category and status below. */
+    .line {
+        grid-template-columns: minmax(0, 1fr) auto 36px;
+        grid-template-areas:
+            "merchant total actions"
+            "date status actions"
+            "category status actions";
+        gap: 4px 10px;
+        padding: 12px 14px;
+    }
+
+    .merchant { grid-area: merchant; }
+    .total { grid-area: total; align-self: start; }
+    .date { grid-area: date; color: var(--muted); font-size: 13px; }
+    .category { grid-area: category; font-size: 13px; }
+    .status { grid-area: status; justify-self: end; align-self: end; }
+    .actions { grid-area: actions; align-self: start; }
+}

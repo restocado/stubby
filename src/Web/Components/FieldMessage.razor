@@ -1,6 +1,6 @@
 @if (Errors.TryGetValue(Field, out var message))
 {
-    <div class="text-danger small mt-1" role="alert">@message</div>
+    <div class="field-error" role="alert">@message</div>
 }
 
 @code {
