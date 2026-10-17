@@ -24,6 +24,8 @@ A receipt is flagged if any rule is true. Each true rule adds its reason.
 
 A missing total gives only `TotalMissing`. Merchant is not checked. Without a tax, the subtotal check is skipped. Reasons are stored comma-separated in `FlagReasons`.
 
+A receipt with a tip, a surcharge or a service charge has a total above subtotal + tax, so it is flagged `SubtotalTaxMismatch`. That is accepted for now: the user sees the flag in review and approves. Skipping the check when the total is higher, or reading a tip field, were considered and left out.
+
 ## Acceptance criteria
 
 - Total 25.00 with a recent date is not flagged.

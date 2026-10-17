@@ -28,6 +28,25 @@ internal sealed class FakeReceiptRepository : IReceiptRepository
         return Task.FromResult(new ReceiptPage(items, Receipts.Count));
     }
 
+    public Task<Receipt?> ClaimNextQueuedAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var next = Receipts
+            .Where(r => r.Status == ReceiptStatus.Queued)
+            .OrderBy(r => r.CreatedAt)
+            .FirstOrDefault();
+        next?.StartProcessing(now);
+        return Task.FromResult(next);
+    }
+
+    /// <summary>The fake hands out the stored instances, so changes are already saved. This counts the saves.</summary>
+    public int Saves { get; private set; }
+
+    public Task SaveAsync(Receipt receipt, CancellationToken cancellationToken)
+    {
+        Saves++;
+        return Task.CompletedTask;
+    }
+
     public Task<bool> TryAddAsync(Receipt receipt, CancellationToken cancellationToken)
     {
         if (ExceptionOnAdd is not null)
@@ -67,6 +86,11 @@ internal sealed class FakeImageStore : IImageStore
         Files[path] = content.ToArray();
         return Task.FromResult(path);
     }
+
+    public Task<byte[]> ReadAsync(string path, CancellationToken cancellationToken) =>
+        Files.TryGetValue(path, out var content)
+            ? Task.FromResult(content)
+            : Task.FromException<byte[]>(new FileNotFoundException("No such stored file.", path));
 
     public Task DeleteAsync(string path, CancellationToken cancellationToken)
     {

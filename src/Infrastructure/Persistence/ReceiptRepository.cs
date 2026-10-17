@@ -40,6 +40,45 @@ internal sealed class ReceiptRepository(IDbContextFactory<StubbyDbContext> dbFac
         return new ReceiptPage(items, totalCount);
     }
 
+    public async Task<Receipt?> ClaimNextQueuedAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        // EF has no SKIP LOCKED in LINQ. The row stays locked until the commit, and a caller that finds it
+        // locked skips to the next Queued row, so two callers never get the same receipt.
+        var claimed = (await db.Receipts
+            .FromSql($"""
+                SELECT * FROM "Receipts"
+                WHERE "Status" = 'Queued'
+                ORDER BY "CreatedAt"
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+                """)
+            .ToListAsync(cancellationToken)).SingleOrDefault();
+        if (claimed is null)
+        {
+            return null;
+        }
+
+        claimed.StartProcessing(now);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return claimed;
+    }
+
+    public async Task SaveAsync(Receipt receipt, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+
+        // The receipt was changed outside this context, so it is attached and every column is written,
+        // except the identity column, which the database owns.
+        var entry = db.Receipts.Attach(receipt);
+        entry.State = EntityState.Modified;
+        entry.Property(r => r.TransactionNo).IsModified = false;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<bool> TryAddAsync(Receipt receipt, CancellationToken cancellationToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
