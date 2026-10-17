@@ -34,4 +34,4 @@ Read these before changing behavior. They are consistent with each other, so kee
 
 ## Git
 
-The working branch is `docs`; PRs go to `main`.
+`feat/*` branches are cut from `dev` and merged into `dev` by PR. `dev` is merged into `main` by PR.
