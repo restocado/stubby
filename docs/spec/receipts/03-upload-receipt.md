@@ -8,7 +8,7 @@
 
 Validate a file, reject duplicates, store it, queue the receipt and return at once (NFR-P2).
 
-The command carries the file name, content type, declared size and a read stream. The response is one of: `Created(id, transactionNo)`, `UnsupportedType`, `TooLarge`, `Empty` or `Duplicate(existingTransactionNo)`. Rejections are returned values, not exceptions. The slice knows nothing about HTTP; the page turns each case into a message.
+The command is a Mediator `ICommand<UploadReceiptResponse>`, handled by an `ICommandHandler`, and the page sends it through `IMediator`. It carries the file name, content type, declared size and a read stream. The response is one of: `Created(id, transactionNo)`, `UnsupportedType`, `TooLarge`, `Empty` or `Duplicate(existingTransactionNo)`. Rejections are returned values, not exceptions. The slice knows nothing about HTTP; the page turns each case into a message.
 
 ## Behavior
 
@@ -18,7 +18,7 @@ The command carries the file name, content type, declared size and a read stream
 4. Store the file, create the receipt as Queued, save, return its id and the transaction number the database assigned.
 5. If saving fails, delete the stored file. A unique-index violation from a race counts as a duplicate: look up the existing receipt by checksum and return `Duplicate` with its number.
 
-Rejections queue nothing and leave no file. The Blazor circuit must allow the largest file: the SignalR maximum receive message size is raised to at least 10 MB plus overhead.
+Rejections queue nothing and leave no file. `InputFile` sends the file over the Blazor circuit in segments, so the SignalR message size limit is left at its default. This is unverified: upload a 10 MB file in the running app, and raise `MaximumReceiveMessageSize` only if it fails.
 
 ## Acceptance criteria
 

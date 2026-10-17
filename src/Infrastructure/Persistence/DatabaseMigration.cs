@@ -7,8 +7,8 @@ public static class DatabaseMigration
 {
     public static async Task MigrateDatabaseAsync(this IServiceProvider services)
     {
-        await using var scope = services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<StubbyDbContext>();
+        var dbFactory = services.GetRequiredService<IDbContextFactory<StubbyDbContext>>();
+        await using var db = await dbFactory.CreateDbContextAsync();
         await db.Database.MigrateAsync();
     }
 }
