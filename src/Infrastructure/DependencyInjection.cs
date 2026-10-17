@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Stubby.Application.Abstractions;
 using Stubby.Infrastructure.AiGateway;
+using Stubby.Infrastructure.Extraction;
 using Stubby.Infrastructure.Pdf;
 using Stubby.Infrastructure.Persistence;
 using Stubby.Infrastructure.Storage;
@@ -35,6 +36,7 @@ public static class DependencyInjection
         }
 
         services.AddSingleton<IPdfRenderer>(new PdfToImageRenderer(pdfDpi));
+        services.AddTransient<IReceiptExtractor, VisionReceiptExtractor>();
         return services;
     }
 }

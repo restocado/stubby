@@ -6,6 +6,9 @@ namespace Stubby.Application.Abstractions;
 /// </summary>
 public interface IAiGateway
 {
+    /// <summary>The configured model that calls are sent to.</summary>
+    string Model { get; }
+
     /// <exception cref="AiGatewayException">The call failed: provider error, timeout, rate limit or open circuit.</exception>
     Task<string> CompleteAsync(AiRequest request, CancellationToken cancellationToken);
 }

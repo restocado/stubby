@@ -12,6 +12,8 @@ internal sealed class AiGateway(
     AiGatewayOptions options,
     ILogger<AiGateway> logger) : IAiGateway
 {
+    public string Model => options.Model;
+
     public async Task<string> CompleteAsync(AiRequest request, CancellationToken cancellationToken)
     {
         var model = options.Model;
