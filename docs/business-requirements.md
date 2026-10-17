@@ -13,10 +13,28 @@ Take a photo of a receipt, check the details Stubby picked up, and see where thi
 
 ## How it works
 
-1. Upload a receipt image (JPG, PNG, or PDF).
-2. A background job sends the image to the vision model, which fills in the merchant, date, and total.
-3. A review screen shows the receipt beside the extracted fields. The user confirms or corrects them.
-4. Approved receipts feed monthly totals by category, with CSV export.
+1. Upload a receipt image (JPG, PNG, or PDF). Any other file type is rejected with an error and never queued. The receipt is added to the processing queue automatically with the status Queued.
+2. A background job picks up the receipt (status Processing) and sends the image to the vision model, which fills in the merchant, date, and total. While the receipt is Queued or Processing the user cannot open it. The user can keep uploading other receipts.
+3. When extraction works, the receipt becomes For review, and it is flagged if the total looks wrong. If extraction does not work, the receipt is put back in the queue and retried automatically, up to 3 attempts in total per receipt. If the third attempt also fails, it becomes Failed.
+4. A receipts list shows all receipts, newest first, with their status (Queued, Processing, Failed, For review, Approved). The user opens a For review or Failed receipt from this list.
+5. A review screen shows the receipt beside the extracted fields. The user confirms or corrects them and picks the category. For a Failed receipt the user enters the details manually.
+6. Approved receipts feed monthly totals by category, with CSV export. Approved receipts can be viewed from the list but can never be edited.
+
+## Receipt statuses
+
+A receipt moves through these statuses. Queued and Processing receipts are locked, so the user cannot open them. Only Approved receipts feed the monthly totals. Every correction made on the review screen is stored.
+
+```mermaid
+flowchart LR
+    Q[Queued] --> P[Processing]
+    P --> OK{Extraction<br/>worked?}
+    OK -- Yes --> R[For review<br/>flagged if total looks wrong]
+    OK -- No --> RT{Attempts used<br/>less than 3?}
+    RT -- Yes --> Q
+    RT -- No --> F[Failed<br/>user enters details manually]
+    R --> A[Approved<br/>read-only, never editable]
+    F --> A
+```
 
 ## Users
 
