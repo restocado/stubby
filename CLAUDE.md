@@ -4,7 +4,7 @@ Single-user .NET 10 Blazor app that reads receipts with a vision model. See [REA
 
 ## Status
 
-Design phase. Only documentation exists in `docs/`. Do not scaffold code unless asked.
+Scaffolded. `docs/` holds the design and `src/` holds empty projects wired per `docs/architecture.md`; no feature code yet. Only architecture tests exist in `tests/`. Build with `dotnet build Stubby.slnx`, test with `dotnet test --solution Stubby.slnx`.
 
 ## Source of truth
 

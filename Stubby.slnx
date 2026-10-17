@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Application/Stubby.Application.csproj" />
+    <Project Path="src/Domain/Stubby.Domain.csproj" />
+    <Project Path="src/Eval/Stubby.Eval.csproj" />
+    <Project Path="src/Infrastructure/Stubby.Infrastructure.csproj" />
+    <Project Path="src/Web/Stubby.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Architecture.Tests/Stubby.Architecture.Tests.csproj" />
+  </Folder>
+</Solution>
