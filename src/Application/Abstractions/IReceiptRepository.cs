@@ -11,4 +11,10 @@ public interface IReceiptRepository
     /// already exists. On success the receipt carries the transaction number the database assigned.
     /// </summary>
     Task<bool> TryAddAsync(Receipt receipt, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// One page of receipts, newest first (by <c>CreatedAt</c>, then <c>Id</c>), with the total number of
+    /// receipts. <paramref name="page"/> is 1-based. A page past the end has no items.
+    /// </summary>
+    Task<ReceiptPage> ListAsync(int page, int pageSize, CancellationToken cancellationToken);
 }

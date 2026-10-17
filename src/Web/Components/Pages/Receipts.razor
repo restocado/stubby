@@ -1,0 +1,176 @@
+@page "/receipts"
+@rendermode InteractiveServer
+@implements IDisposable
+@using System.Globalization
+@using Mediator
+@using Stubby.Application.Features.Receipts.ListReceipts
+@using Stubby.Domain.Receipts
+@inject IMediator Sender
+@inject ILogger<Receipts> Logger
+
+<PageTitle>Receipts</PageTitle>
+
+<h1>Receipts</h1>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger" role="alert">@_error</div>
+}
+
+@if (_response is null)
+{
+    @if (_error is null)
+    {
+        <p>Loading...</p>
+    }
+}
+else if (_response.TotalCount == 0)
+{
+    <p>No receipts yet. <a href="upload">Upload one</a>.</p>
+}
+else if (_response.Items.Count == 0)
+{
+    <p>There is no page @_page. <a href="receipts?page=@_response.PageCount">Go to the last page</a>.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Number</th>
+                    <th>File</th>
+                    <th>Status</th>
+                    <th>Merchant</th>
+                    <th>Date</th>
+                    <th class="text-end">Total</th>
+                    <th>Category</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in _response.Items)
+                {
+                    <tr @key="item.Id">
+                        <td class="text-nowrap">@TransactionNumber.Format(item.TransactionNo)</td>
+                        <td class="text-break">@item.OriginalFileName</td>
+                        <td class="text-nowrap">
+                            <span class="badge @StatusClass(item.Status)">@StatusText(item.Status)</span>
+                            @if (item.IsFlagged)
+                            {
+                                <span class="badge text-bg-warning" title="This receipt needs a closer look">Flagged</span>
+                            }
+                        </td>
+                        <td>@item.Merchant</td>
+                        <td class="text-nowrap">@item.ReceiptDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</td>
+                        <td class="text-end text-nowrap">@item.Total?.ToString("F2", CultureInfo.InvariantCulture)</td>
+                        <td>@item.Category?.ToString().ToLowerInvariant()</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <nav class="d-flex align-items-center gap-3" aria-label="Receipt pages">
+        @if (_page > 1)
+        {
+            <a href="receipts?page=@(_page - 1)">Previous</a>
+        }
+        <span>Page @_page of @_response.PageCount</span>
+        @if (_page < _response.PageCount)
+        {
+            <a href="receipts?page=@(_page + 1)">Next</a>
+        }
+    </nav>
+}
+
+@code {
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(3);
+
+    private readonly CancellationTokenSource _disposed = new();
+    private ListReceiptsResponse? _response;
+    private string? _error;
+    private int _page = 1;
+    private bool _loading;
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int? PageNumber { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _page = Math.Max(PageNumber ?? 1, 1);
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RefreshWhileProcessingAsync();
+        }
+    }
+
+    // Reloads every few seconds, but only while something is still Queued or Processing.
+    private async Task RefreshWhileProcessingAsync()
+    {
+        using var timer = new PeriodicTimer(RefreshInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_disposed.Token))
+            {
+                var pending = _response?.Items.Any(i => i.Status is ReceiptStatus.Queued or ReceiptStatus.Processing) == true;
+                if (pending && !_loading)
+                {
+                    await InvokeAsync(LoadAsync);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page was closed.
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _response = await Sender.Send(new ListReceiptsQuery(_page), _disposed.Token);
+            _error = null;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load receipts page {Page}.", _page);
+            _error = "Could not load receipts. Try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+
+        StateHasChanged();
+    }
+
+    private static string StatusText(ReceiptStatus status) =>
+        status == ReceiptStatus.ForReview ? "For review" : status.ToString();
+
+    private static string StatusClass(ReceiptStatus status) => status switch
+    {
+        ReceiptStatus.Queued => "text-bg-secondary",
+        ReceiptStatus.Processing => "text-bg-info",
+        ReceiptStatus.ForReview => "text-bg-primary",
+        ReceiptStatus.Failed => "text-bg-danger",
+        ReceiptStatus.Approved => "text-bg-success",
+        _ => "text-bg-light",
+    };
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}

@@ -19,6 +19,27 @@ internal sealed class ReceiptRepository(IDbContextFactory<StubbyDbContext> dbFac
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<ReceiptPage> ListAsync(int page, int pageSize, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var totalCount = await db.Receipts.CountAsync(cancellationToken);
+
+        // Long math, so a huge page number cannot overflow.
+        if ((page - 1L) * pageSize >= totalCount)
+        {
+            return new ReceiptPage([], totalCount);
+        }
+
+        var items = await db.Receipts
+            .AsNoTracking()
+            .OrderByDescending(r => r.CreatedAt)
+            .ThenByDescending(r => r.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+        return new ReceiptPage(items, totalCount);
+    }
+
     public async Task<bool> TryAddAsync(Receipt receipt, CancellationToken cancellationToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);

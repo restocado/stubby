@@ -17,6 +17,17 @@ internal sealed class FakeReceiptRepository : IReceiptRepository
     public Task<long?> FindTransactionNoByChecksumAsync(string checksum, CancellationToken cancellationToken) =>
         Task.FromResult(Receipts.FirstOrDefault(r => r.Checksum == checksum)?.TransactionNo);
 
+    public Task<ReceiptPage> ListAsync(int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var items = Receipts
+            .OrderByDescending(r => r.CreatedAt)
+            .ThenByDescending(r => r.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+        return Task.FromResult(new ReceiptPage(items, Receipts.Count));
+    }
+
     public Task<bool> TryAddAsync(Receipt receipt, CancellationToken cancellationToken)
     {
         if (ExceptionOnAdd is not null)
