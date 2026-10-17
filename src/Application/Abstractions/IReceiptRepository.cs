@@ -25,6 +25,12 @@ public interface IReceiptRepository
     Task<Receipt?> ClaimNextQueuedAsync(DateTimeOffset now, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Returns every Processing receipt to Queued, in one transaction, with its attempts unchanged.
+    /// Returns how many there were.
+    /// </summary>
+    Task<int> RequeueInterruptedAsync(DateTimeOffset now, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Saves the changes made to a receipt that <see cref="ClaimNextQueuedAsync"/> returned. Only the
     /// caller that claimed a Processing receipt may change it, so no concurrency check is made.
     /// </summary>

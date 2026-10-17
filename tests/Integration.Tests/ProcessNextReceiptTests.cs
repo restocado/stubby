@@ -11,21 +11,10 @@ namespace Stubby.Integration.Tests;
 /// <summary>Uploads and processing through the real handlers, repository, file store and database. Only the model is stubbed.</summary>
 public class ProcessNextReceiptTests(PostgresFixture fixture) : PostgresTest(fixture)
 {
-    private int _uploads;
-
     private Task<ProcessNextReceiptResult> ProcessAsync() => ProcessUntilAsync(Token);
 
     private Task<ProcessNextReceiptResult> ProcessUntilAsync(CancellationToken cancellationToken) =>
         InScopeAsync(async sp => await sp.GetRequiredService<IMediator>().Send(new ProcessNextReceiptCommand(), cancellationToken));
-
-    /// <summary>Uploads a small PNG with bytes of its own, so it is never a duplicate. Returns the new receipt's id.</summary>
-    private async Task<Guid> UploadAsync()
-    {
-        byte[] content = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, (byte)Interlocked.Increment(ref _uploads)];
-        var response = await InScopeAsync(async sp => await sp.GetRequiredService<IMediator>().Send(
-            new UploadReceiptCommand("receipt.png", "image/png", content.Length, new MemoryStream(content)), Token));
-        return Assert.IsType<UploadReceiptResponse.Created>(response).Id;
-    }
 
     [Fact]
     public async Task A_success_ends_ForReview_with_the_extracted_fields_stored()

@@ -151,6 +151,9 @@ internal sealed class StubExtractor : IReceiptExtractor
 
     public Action<CancellationToken>? OnExtract { get; set; }
 
+    /// <summary>When set, every call waits for it, so a test can hold a receipt mid-extraction. A shutdown cancels the wait.</summary>
+    public TaskCompletionSource? Gate { get; set; }
+
     public int Calls => _calls;
 
     private int _calls;
@@ -160,13 +163,19 @@ internal sealed class StubExtractor : IReceiptExtractor
         Result = Sample;
         Failure = null;
         OnExtract = null;
+        Gate = null;
         _calls = 0;
     }
 
-    public Task<ExtractionResult> ExtractAsync(ReceiptFile file, CancellationToken cancellationToken)
+    public async Task<ExtractionResult> ExtractAsync(ReceiptFile file, CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref _calls);
         OnExtract?.Invoke(cancellationToken);
-        return Failure is null ? Task.FromResult(Result) : Task.FromException<ExtractionResult>(Failure);
+        if (Gate is { } gate)
+        {
+            await gate.Task.WaitAsync(cancellationToken);
+        }
+
+        return Failure is null ? Result : throw Failure;
     }
 }
