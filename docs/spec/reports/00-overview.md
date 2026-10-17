@@ -4,7 +4,7 @@
 
 Monthly totals by category and CSV export. Both read Approved receipts only.
 
-Follows `docs/architecture.md`: one query slice each, in `Application/Features/Reports/<Slice>/`. No accuracy screen in v1. Not started.
+Follows `docs/architecture.md`: one query slice each, in `Application/Features/Reports/<Slice>/`. No accuracy screen in v1. Both read through `IReportReader` (`Application/Abstractions/`), implemented in `Infrastructure/Persistence/ReportReader.cs` with exact PostgreSQL sums and no tracking.
 
 | File | Contents |
 |---|---|

@@ -141,12 +141,13 @@ else
     private bool _loading;
     private bool _busy;
 
+    // Text, and parsed here: a value such as "abc" cannot be bound to a number, and the binding would throw.
     [SupplyParameterFromQuery(Name = "page")]
-    public int? PageNumber { get; set; }
+    public string? PageText { get; set; }
 
     protected override async Task OnParametersSetAsync()
     {
-        _page = Math.Max(PageNumber ?? 1, 1);
+        _page = int.TryParse(PageText, NumberStyles.None, CultureInfo.InvariantCulture, out var page) && page >= 1 ? page : 1;
         await LoadAsync();
     }
 

@@ -35,6 +35,7 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapReceiptEndpoints();
+app.MapReportEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

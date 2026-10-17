@@ -24,6 +24,7 @@ public static class DependencyInjection
         services.AddDbContextFactory<StubbyDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("Stubby")));
         services.AddScoped<IReceiptRepository, ReceiptRepository>();
+        services.AddScoped<IReportReader, ReportReader>();
         services.AddSingleton<IImageStore>(sp =>
             new FileSystemImageStore(imageRoot, sp.GetRequiredService<ILogger<FileSystemImageStore>>()));
         services.AddAiGateway(configuration);
