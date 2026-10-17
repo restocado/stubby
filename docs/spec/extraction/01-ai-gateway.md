@@ -19,7 +19,7 @@ The only code that talks to model providers. Sends images and a prompt, returns 
 - **No retry.** The worker owns the attempt budget (NFR-R1). No fallback provider in v1.
 - Logs model, duration, outcome, image count and token counts per call. Never logs prompts, images or replies.
 - Every failure (provider error, timeout, rate limit, open circuit) surfaces as `AiGatewayException` with a short reason. A caller's own cancellation is not wrapped.
-- A missing API key fails the call, not startup, so the rest of the app runs without one. Set it with `dotnet user-secrets set "AiGateway:OllamaCloud:ApiKey" "<key>" --project src/Web`, or the environment variable `AiGateway__OllamaCloud__ApiKey`.
+- A missing API key fails the call, not startup, so the rest of the app runs without one. Set it with `dotnet user-secrets set "AiGateway:OllamaCloud:ApiKey" "<key>" --project src/Web`, or the environment variable `AiGateway__OllamaCloud__ApiKey`. `appsettings.json` holds a blank `ApiKey` as a placeholder, which counts as missing. The key never goes in that file.
 - Settings are read once at startup, so a new model name or limit needs a restart. `AiGateway:Models` is a list of name and provider pairs and not a dictionary, because a model name such as `gemma4:31b` has a colon, which configuration reads as a section separator.
 - The provider call is Ollama's native `POST api/chat` with `stream: false` and the images as base64. The reply's `prompt_eval_count` and `eval_count` are the token counts that are logged. No sampling options are sent yet.
 
