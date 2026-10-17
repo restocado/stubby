@@ -17,3 +17,6 @@ trim_trailing_whitespace = false
 [*.cs]
 csharp_style_namespace_declarations = file_scoped:warning
 dotnet_sort_system_directives_first = true
+
+[**/Migrations/*.cs]
+generated_code = true

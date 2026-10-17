@@ -1,5 +1,6 @@
 using Stubby.Application;
 using Stubby.Infrastructure;
+using Stubby.Infrastructure.Persistence;
 using Stubby.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,9 +8,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    await app.Services.MigrateDatabaseAsync();
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
