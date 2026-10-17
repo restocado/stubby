@@ -1,6 +1,11 @@
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Stubby.Application;
@@ -36,6 +41,43 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public string ImageRoot => _imageRoot;
 
+    private string _testConnection = string.Empty;
+    private WebApplicationFactory<Program>? _web;
+
+    private Dictionary<string, string?> SettingOverrides() => new()
+    {
+        ["ConnectionStrings:Stubby"] = _testConnection,
+        ["ImageStorage:RootPath"] = _imageRoot,
+    };
+
+    /// <summary>
+    /// A client for the real app, started once, on this database and with the stubbed model. The "Testing"
+    /// environment does not migrate (the fixture already did), and the background worker is removed, so
+    /// nothing is read unless a test asks for it.
+    /// </summary>
+    public HttpClient CreateWebClient()
+    {
+        _web ??= new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+
+            // UseSetting, not ConfigureAppConfiguration: Program reads some settings, such as the image folder, while it
+            // registers services, which is before ConfigureAppConfiguration takes effect.
+            foreach (var (key, value) in SettingOverrides())
+            {
+                builder.UseSetting(key, value);
+            }
+
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IHostedService>();
+                services.RemoveAll<IReceiptExtractor>();
+                services.AddSingleton<IReceiptExtractor>(Extractor);
+            });
+        });
+        return _web.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+    }
+
     public async ValueTask InitializeAsync()
     {
         _adminConnection = Environment.GetEnvironmentVariable("STUBBY_TEST_PG") ?? DefaultAdminConnection;
@@ -56,14 +98,10 @@ public sealed class PostgresFixture : IAsyncLifetime
             return;
         }
 
-        var testConnection = new NpgsqlConnectionStringBuilder(_adminConnection) { Database = _databaseName }.ConnectionString;
+        _testConnection = new NpgsqlConnectionStringBuilder(_adminConnection) { Database = _databaseName }.ConnectionString;
         Configuration = new ConfigurationBuilder()
             .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "web-appsettings.json"))
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:Stubby"] = testConnection,
-                ["ImageStorage:RootPath"] = _imageRoot,
-            })
+            .AddInMemoryCollection(SettingOverrides())
             .Build();
 
         var services = new ServiceCollection();
@@ -103,6 +141,7 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
+        _web?.Dispose();
         if (Provider is not null)
         {
             await Provider.DisposeAsync();

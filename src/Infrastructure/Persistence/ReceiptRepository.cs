@@ -42,6 +42,42 @@ internal sealed class ReceiptRepository(IDbContextFactory<StubbyDbContext> dbFac
         return new ReceiptPage(items, totalCount);
     }
 
+    public async Task<Receipt?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Receipts.AsNoTracking().SingleOrDefaultAsync(r => r.Id == id, cancellationToken);
+    }
+
+    public async Task<ReceiptWriteOutcome> ApproveAsync(
+        Guid id,
+        Func<Receipt, IReadOnlyList<FieldRecord>?> approve,
+        CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        // The row lock makes a second approval, or a delete, of the same receipt wait for this transaction and
+        // then see its result, so a receipt cannot be approved twice.
+        var receipt = (await db.Receipts
+            .FromSql($"""SELECT * FROM "Receipts" WHERE "Id" = {id} FOR UPDATE""")
+            .ToListAsync(cancellationToken)).SingleOrDefault();
+        if (receipt is null)
+        {
+            return ReceiptWriteOutcome.NotFound;
+        }
+
+        var records = approve(receipt);
+        if (records is null)
+        {
+            return ReceiptWriteOutcome.Conflict;
+        }
+
+        db.FieldRecords.AddRange(records);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return ReceiptWriteOutcome.Done;
+    }
+
     public async Task<Receipt?> ClaimNextQueuedAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
         // The claim can come back empty while Queued receipts remain. If another caller commits the row this

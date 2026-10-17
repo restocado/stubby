@@ -28,6 +28,37 @@ internal sealed class FakeReceiptRepository : IReceiptRepository
         return Task.FromResult(new ReceiptPage(items, Receipts.Count));
     }
 
+    public List<FieldRecord> FieldRecords { get; } = [];
+
+    /// <summary>Runs after every <see cref="FindByIdAsync"/>, so a test can change a receipt behind a handler's back.</summary>
+    public Action<Receipt?>? AfterFind { get; set; }
+
+    public Task<Receipt?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var receipt = Receipts.FirstOrDefault(r => r.Id == id);
+        AfterFind?.Invoke(receipt);
+        return Task.FromResult(receipt);
+    }
+
+    public Task<ReceiptWriteOutcome> ApproveAsync(
+        Guid id, Func<Receipt, IReadOnlyList<FieldRecord>?> approve, CancellationToken cancellationToken)
+    {
+        var receipt = Receipts.FirstOrDefault(r => r.Id == id);
+        if (receipt is null)
+        {
+            return Task.FromResult(ReceiptWriteOutcome.NotFound);
+        }
+
+        var records = approve(receipt);
+        if (records is null)
+        {
+            return Task.FromResult(ReceiptWriteOutcome.Conflict);
+        }
+
+        FieldRecords.AddRange(records);
+        return Task.FromResult(ReceiptWriteOutcome.Done);
+    }
+
     public Task<Receipt?> ClaimNextQueuedAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
         var next = Receipts

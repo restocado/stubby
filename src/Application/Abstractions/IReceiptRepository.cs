@@ -18,6 +18,20 @@ public interface IReceiptRepository
     /// </summary>
     Task<ReceiptPage> ListAsync(int page, int pageSize, CancellationToken cancellationToken);
 
+    /// <summary>Reads one receipt, or null when there is none. The result is a snapshot: changes to it are not saved.</summary>
+    Task<Receipt?> FindByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Approves a receipt in one transaction. The row is locked and loaded, <paramref name="approve"/> is run on it,
+    /// and the receipt and the field records it returns are saved together, so either all of it is written or none.
+    /// <paramref name="approve"/> returns null when the receipt is not in a state that can be approved, which is
+    /// checked inside the transaction because the status may have changed since it was last read.
+    /// </summary>
+    Task<ReceiptWriteOutcome> ApproveAsync(
+        Guid id,
+        Func<Receipt, IReadOnlyList<FieldRecord>?> approve,
+        CancellationToken cancellationToken);
+
     /// <summary>
     /// Takes the oldest Queued receipt (by <c>CreatedAt</c>) and sets it Processing, in one transaction that
     /// locks the row and skips rows other callers hold. Returns null when nothing is Queued.

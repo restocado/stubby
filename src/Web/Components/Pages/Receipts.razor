@@ -51,7 +51,17 @@ else
                 @foreach (var item in _response.Items)
                 {
                     <tr @key="item.Id">
-                        <td class="text-nowrap">@TransactionNumber.Format(item.TransactionNo)</td>
+                        <td class="text-nowrap">
+                            @* Queued and Processing receipts are still being read, so they cannot be opened. *@
+                            @if (item.CanOpen || item.Status == ReceiptStatus.Approved)
+                            {
+                                <a href="receipts/@item.Id">@TransactionNumber.Format(item.TransactionNo)</a>
+                            }
+                            else
+                            {
+                                @TransactionNumber.Format(item.TransactionNo)
+                            }
+                        </td>
                         <td class="text-break">@item.OriginalFileName</td>
                         <td class="text-nowrap">
                             <span class="badge @StatusClass(item.Status)">@StatusText(item.Status)</span>
