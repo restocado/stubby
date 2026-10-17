@@ -1,0 +1,16 @@
+# Reports Module : Overview
+
+**Status:** Draft
+
+Monthly totals by category and CSV export. Both read Approved receipts only.
+
+Follows `docs/architecture.md`: one query slice each, in `Application/Features/Reports/<Slice>/`. No accuracy screen in v1. Not started.
+
+| File | Contents |
+|---|---|
+| [01-get-monthly-totals.md](01-get-monthly-totals.md) | Totals by category for a month |
+| [02-export-receipts-csv.md](02-export-receipts-csv.md) | CSV export |
+| [03-test-plan.md](03-test-plan.md) | Cross-cutting tests |
+| [04-open-decisions.md](04-open-decisions.md) | Open items |
+
+**Build order:** needs receipts 01, 02 and 06. Then 01 and 02 in parallel.

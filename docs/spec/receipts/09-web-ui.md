@@ -1,0 +1,33 @@
+# Web UI
+
+**Status:** Draft  
+**Location:** `Web/Components/Pages/`: `Upload.razor`, `Receipts.razor`, `ReviewReceipt.razor`. Blazor Interactive Server. Pages call the slices and hold no business rules.  
+**Depends on:** 03 to 08.
+
+## Scope
+
+Pages for upload, the receipts list and review. Monthly totals belong to the reports module. There is no UI design document, so this lists behavior and not layout.
+
+## Behavior
+
+State lives in the database, not the browser. Every page loads current data on open.
+
+- **Upload:** accepts JPG, PNG and PDF, several files at once, camera or photo on a phone. Posts each file separately and shows a per-file result (queued, unsupported type, too large, or duplicate with the existing receipt's number, for example "Already uploaded as TXN-000042").
+- **List:** 25 per page. Shows transaction number, status, flag mark, and merchant, date, total and category where known. Queued and Processing rows have no open or delete action. Delete asks for confirmation. Failed rows have Reprocess. A "Reprocess all failed" action shows the count requeued. The list refreshes while any row is Queued or Processing.
+- **Review:** shows the transaction number as read-only text. Image or PDF beside the fields, stacked on narrow screens. Merchant, date, total and a category select. A flagged receipt shows a banner with reasons. Failed receipts show the last error and offer manual entry, reprocess or delete. Approve returns to the list. Approved receipts are read-only with no approve button.
+- Errors show a short message, never an unhandled error page (NFR-R3).
+
+## Acceptance criteria
+
+- A rejected upload shows an error and adds no row.
+- A duplicate upload shows the existing receipt's number in the form `TXN-000042`.
+- Choosing 3 valid files creates 3 Queued receipts with increasing transaction numbers and the page stays usable.
+- The transaction number appears in the list and on review in the form `TXN-000042`, and cannot be edited.
+- A flagged receipt is marked in the list and has a banner on review (NFR-U3).
+- Queued and Processing rows cannot be opened or deleted.
+- Changing the total and approving stores both the extracted and the final total.
+- An Approved receipt has no editable input and no approve button.
+- Cancelling the delete confirmation deletes nothing.
+- After a dropped connection, reloading shows current server state.
+- At 375 px wide nothing overflows sideways and every action is reachable (NFR-U2).
+- Works in current Chrome, Edge and Firefox. List and review each load in under 2 seconds.
