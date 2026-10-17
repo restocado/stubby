@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Stubby.Application.Abstractions;
+using Stubby.Infrastructure.AiGateway;
 using Stubby.Infrastructure.Persistence;
 using Stubby.Infrastructure.Storage;
 
@@ -23,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<IReceiptRepository, ReceiptRepository>();
         services.AddSingleton<IImageStore>(sp =>
             new FileSystemImageStore(imageRoot, sp.GetRequiredService<ILogger<FileSystemImageStore>>()));
+        services.AddAiGateway(configuration);
         return services;
     }
 }

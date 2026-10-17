@@ -41,6 +41,7 @@ flowchart LR
 | Database context created per repository call, through `IDbContextFactory` | A Blazor circuit lives as long as the browser tab, so a scoped context would be shared by every page. It is not thread-safe, so the list refresh and an upload at the same time would collide, and it would keep stale tracked entities. A context per call avoids both. A slice that needs one transaction over several steps does it inside a single repository method. |
 | Extraction behind a receipt extractor, which calls an AI gateway | Prompt and parsing are separate from provider access. Changing provider touches only an adapter (NFR-M2). |
 | The gateway does not retry; the worker owns the attempt budget, a setting that starts at 1 | Two retry layers would multiply the attempts and break the configured total (NFR-R1). Starting at 1 means no automatic retry, which limits token use. |
+| The gateway's timeout, rate limit and circuit breaker use `Microsoft.Extensions.Http.Resilience`, with no retry strategy | Standard, tested policies on top of Polly instead of hand-written ones. A call over the rate limit waits, up to its timeout. The timeout grows with the image count, because a long PDF takes longer than a photo. |
 
 ## Components
 
