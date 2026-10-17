@@ -10,6 +10,7 @@ Follows `docs/architecture.md`: one query slice each, in `Application/Features/R
 |---|---|
 | [01-get-monthly-totals.md](01-get-monthly-totals.md) | Totals by category for a month |
 | [02-export-receipts-csv.md](02-export-receipts-csv.md) | CSV export |
+| [05-get-totals-trend.md](05-get-totals-trend.md) | 12-month strip, change on the month before, average |
 | [03-test-plan.md](03-test-plan.md) | Cross-cutting tests |
 | [04-open-decisions.md](04-open-decisions.md) | Open items |
 

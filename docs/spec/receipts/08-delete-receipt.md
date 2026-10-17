@@ -15,7 +15,7 @@ Remove a receipt and its image for good. Field records stay, unlinked (NFR-D2).
 3. After commit, delete the image file. If that fails, log it (no receipt content: only the transaction number) and still succeed. The image store logs a failed delete itself and does not throw, and the handler also catches anything it might throw.
 4. If the database delete fails, the file is not touched.
 5. A delete and an approval of the same receipt at the same moment run one after the other, because both lock the row. Either the approval ran first and its three records stay, or the delete ran first and the approval finds nothing. Neither leaves a half-done state.
-6. **UI:** a Delete button on every row of the list that is not Queued or Processing, and on the review page of a Failed receipt. It asks "Delete TXN-000042?" in place, with "Yes, delete" and "Cancel", and does nothing until confirmed. A message says what happened.
+6. **UI:** "Delete…" in the actions menu of every row of the list that is not Queued or Processing, and on the review page of an Approved or Failed receipt. It opens a question that says what goes and what stays, with "Keep it" and "Delete receipt", and does nothing until confirmed. A message says what happened.
 
 An Approved receipt leaves the totals and the CSV. The checksum is freed, so the file can be uploaded again.
 
