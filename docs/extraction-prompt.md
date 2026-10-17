@@ -45,4 +45,4 @@ Numbers use a dot as the decimal separator, with no currency symbol and no thous
 
 | Version | Date | Change | Eval result |
 |---|---|---|---|
-| v1 | 2026-10-17 | First prompt. | Not run yet. |
+| v1 | 2026-10-17 | First prompt. | Informal check, not the eval set: 8 clean generated receipts (photos, one tilted, and PDFs including a 2-page one) on `gemma4:31b`, 40 of 40 fields right, about 1 s a call. The ambiguous `03/09/2026` date came back `null`, as asked. The 30-receipt eval set has not been run. |
