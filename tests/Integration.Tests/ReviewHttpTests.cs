@@ -129,9 +129,8 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
         Assert.Contains("value=\"2026-10-02\"", html, StringComparison.Ordinal);
         Assert.Contains("value=\"12.50\"", html, StringComparison.Ordinal);
         Assert.Contains($"api/receipts/{id}/image", html, StringComparison.Ordinal);
-        Assert.Contains("Choose a category", html, StringComparison.Ordinal);
-        Assert.Contains("Nothing is saved until you approve.", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("Please check this receipt", html, StringComparison.Ordinal);
+        Assert.Matches(@"Approve\s*<span[^>]*>Enter</span>", html);
+        Assert.DoesNotContain("banner-warn", html, StringComparison.Ordinal);
         foreach (var category in Enum.GetValues<ReceiptCategory>())
         {
             Assert.Contains(category.ToString().ToLowerInvariant(), html, StringComparison.Ordinal);
@@ -139,7 +138,7 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
     }
 
     [Fact]
-    public async Task Every_receipt_that_can_be_opened_has_a_back_link_to_the_list_at_the_top()
+    public async Task Every_receipt_that_can_be_opened_has_a_back_link_at_the_top()
     {
         var forReview = await ReadAsync();
         var approved = await ReadAsync();
@@ -149,14 +148,15 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
         var failed = await UploadAsync();
         Assert.IsType<ProcessNextReceiptResult.Failed>(await ProcessOneAsync());
 
-        foreach (var id in new[] { forReview, failed, approved })
+        // Receipts that wait for the user go back to the inbox. An approved one is found in the list, so it goes back there.
+        foreach (var (id, text, href) in new[] { (forReview, "Back to inbox", ""), (failed, "Back to inbox", ""), (approved, "Back to receipts", "receipts") })
         {
             var main = (await GetPageAsync($"/receipts/{id}")).Split("<main")[^1];
 
-            var backLink = main.IndexOf("Back to the receipts", StringComparison.Ordinal);
+            var backLink = main.IndexOf(text, StringComparison.Ordinal);
             Assert.True(backLink >= 0, $"Receipt {id} has no back link.");
-            Assert.True(backLink < main.IndexOf("<h1", StringComparison.Ordinal), "The back link should come before the heading.");
-            Assert.Contains("href=\"receipts\"", main[..backLink], StringComparison.Ordinal);
+            Assert.True(backLink < main.IndexOf("class=\"viewer", StringComparison.Ordinal), "The back link should come before the picture.");
+            Assert.Contains($"class=\"back\" href=\"{href}\"", main[..backLink], StringComparison.Ordinal);
         }
     }
 
@@ -170,6 +170,7 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
 
         Assert.Contains("Please check this receipt", html, StringComparison.Ordinal);
         Assert.Contains("The total is unusually large.", html, StringComparison.Ordinal);
+        Assert.Contains("input big num warn", html, StringComparison.Ordinal);
         Assert.Contains("The date could not be read.", html, StringComparison.Ordinal);
     }
 
@@ -186,7 +187,7 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
     }
 
     [Fact]
-    public async Task A_Failed_receipt_shows_why_and_an_empty_form_for_manual_entry()
+    public async Task A_Failed_receipt_shows_why_and_two_choices_and_no_form_until_one_is_chosen()
     {
         Fixture.Extractor.Failure = new ExtractionException("The provider returned HTTP 503.");
         var id = await UploadAsync();
@@ -194,8 +195,24 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
 
         var html = await GetPageAsync($"/receipts/{id}");
 
-        Assert.Contains("Stubby could not read this receipt", html, StringComparison.Ordinal);
+        Assert.Contains("This receipt couldn't be read", html, StringComparison.Ordinal);
         Assert.Contains("The provider returned HTTP 503.", html, StringComparison.Ordinal);
+        Assert.Contains("Try reading it again", html, StringComparison.Ordinal);
+        Assert.Contains("Type it in myself", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"merchant\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Approve", html.Split("<main")[^1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Choosing_to_type_it_in_opens_an_empty_form()
+    {
+        Fixture.Extractor.Failure = new ExtractionException("The provider returned HTTP 503.");
+        var id = await UploadAsync();
+        Assert.IsType<ProcessNextReceiptResult.Failed>(await ProcessOneAsync());
+
+        var html = await GetPageAsync($"/receipts/{id}?type=1");
+
+        Assert.Contains("id=\"merchant\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("value=\"Fake Cafe\"", html, StringComparison.Ordinal);
         Assert.Contains("Approve", html, StringComparison.Ordinal);
     }
@@ -209,7 +226,7 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
 
         var html = await GetPageAsync($"/receipts/{id}");
 
-        Assert.Contains("approved and can no longer be changed", html, StringComparison.Ordinal);
+        Assert.Contains("This receipt can no longer be changed.", html, StringComparison.Ordinal);
         Assert.Contains("Final Cafe", html, StringComparison.Ordinal);
         Assert.Contains("13.00", html, StringComparison.Ordinal);
         Assert.Contains("dining", html, StringComparison.Ordinal);
@@ -237,7 +254,7 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
     }
 
     [Fact]
-    public async Task The_list_offers_each_receipt_only_the_actions_that_apply_to_it()
+    public async Task The_list_offers_an_actions_menu_only_to_receipts_that_are_not_being_read()
     {
         var forReview = await ReadAsync();
         var approved = await ReadAsync();
@@ -250,16 +267,15 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
 
         var html = await GetPageAsync("/receipts");
 
-        Assert.Contains("Reprocess all failed", html, StringComparison.Ordinal);
-        var rows = html.Split("<tr>").Where(row => row.Contains("TXN-", StringComparison.Ordinal)).ToDictionary(row => RowNumber(row));
-        AssertActions(rows[await NumberAsync(forReview)], reprocess: false, delete: true);
-        AssertActions(rows[await NumberAsync(approved)], reprocess: false, delete: true);
-        AssertActions(rows[await NumberAsync(failed)], reprocess: true, delete: true);
-        AssertActions(rows[await NumberAsync(queued)], reprocess: false, delete: false);
+        var rows = html.Split("class=\"line").Where(row => row.Contains("TXN-", StringComparison.Ordinal)).ToDictionary(row => RowNumber(row));
+        Assert.Contains("aria-label=\"Actions for", rows[await NumberAsync(forReview)], StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Actions for", rows[await NumberAsync(approved)], StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Actions for", rows[await NumberAsync(failed)], StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-label=\"Actions for", rows[await NumberAsync(queued)], StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Only_a_Failed_receipt_offers_reprocess_and_delete_on_its_review_page()
+    public async Task Only_a_Failed_receipt_offers_to_read_it_again_on_its_review_page()
     {
         var forReview = await ReadAsync();
         Fixture.Extractor.Failure = new ExtractionException("The provider returned HTTP 503.");
@@ -269,25 +285,32 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
         var failedHtml = await GetPageAsync($"/receipts/{failed}");
         var forReviewHtml = await GetPageAsync($"/receipts/{forReview}");
 
-        Assert.Contains(">Reprocess</button>", failedHtml, StringComparison.Ordinal);
-        Assert.Contains(">Delete</button>", failedHtml, StringComparison.Ordinal);
-        Assert.DoesNotContain(">Reprocess</button>", forReviewHtml, StringComparison.Ordinal);
-        Assert.DoesNotContain(">Delete</button>", forReviewHtml, StringComparison.Ordinal);
+        Assert.Contains(">Try again</button>", failedHtml.Replace("</svg>", "</svg>"), StringComparison.Ordinal);
+        Assert.Contains("Delete this receipt</button>", failedHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Try again", forReviewHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Delete this receipt", forReviewHtml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_Approved_receipt_can_only_be_deleted_and_never_read_again()
+    {
+        var id = await ReadAsync();
+        await InScopeAsync(async sp => await sp.GetRequiredService<IMediator>().Send(
+            new ApproveReceiptCommand(id, "Final Cafe", new DateOnly(2026, 10, 3), 13.00m, ReceiptCategory.Dining), Token));
+
+        var html = (await GetPageAsync($"/receipts/{id}")).Split("<main")[^1];
+
+        Assert.Contains("Delete&#x2026;", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Try again", html, StringComparison.Ordinal);
     }
 
     private async Task<string> NumberAsync(Guid id) => TransactionNumber.Format((await Fixture.ReloadAsync(id)).TransactionNo);
 
-    // The first cell of a list row is its transaction number, as text or as a link.
+    // The number of a list row is in small text under the merchant.
     private static string RowNumber(string row)
     {
         var start = row.IndexOf("TXN-", StringComparison.Ordinal);
         return row.Substring(start, row.IndexOf('<', start) - start).Trim();
-    }
-
-    private static void AssertActions(string row, bool reprocess, bool delete)
-    {
-        Assert.Equal(reprocess, row.Contains(">Reprocess</button>", StringComparison.Ordinal));
-        Assert.Equal(delete, row.Contains(">Delete</button>", StringComparison.Ordinal));
     }
 
     [Fact]
