@@ -50,6 +50,7 @@ Status: accepted. Accuracy and performance targets come from [business-requireme
 | NFR-D3 | The CSV export contains approved receipts only, and opens correctly in Excel. |
 | NFR-D4 | Only fake or synthetic receipts are used in the demo. No real personal or financial data is stored. |
 | NFR-D5 | Details entered by hand on a Failed receipt are tagged as manual and excluded from all accuracy numbers. |
+| NFR-D6 | Each receipt gets a unique transaction number from a database-generated series, assigned at upload. It is never changed and never reused, including after the receipt is deleted. Two uploads at the same time never get the same number. |
 
 ## Security and privacy
 
