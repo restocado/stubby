@@ -1,0 +1,62 @@
+.inbox { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 22px; align-items: start; }
+.inbox-main, .inbox-side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.tile { padding: 14px 18px; }
+.tile strong { display: flex; align-items: center; gap: 8px; font-size: 28px; line-height: 1.15; letter-spacing: -.02em; }
+
+.item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: inset 4px 0 0 var(--edge, transparent), var(--shadow);
+}
+
+.item.warn { --edge: #e0a526; }
+.item.fail { --edge: #d6443a; }
+.item.reading { padding-block: 12px; }
+
+.item-main { flex: 1; min-width: 0; }
+.item-title { overflow: hidden; font-size: 15px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.amount { min-width: 88px; font-size: 16px; font-weight: 700; text-align: right; }
+.flag { max-width: 200px; }
+
+.live {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: #2fb57e;
+    box-shadow: 0 0 0 4px rgba(47, 181, 126, .2);
+}
+
+.label { font-size: 13px; font-weight: 600; }
+.next-up p { margin: 2px 0 14px; font-size: 15px; }
+.month-total { margin: 2px 0 12px; font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
+.bars { display: grid; gap: 10px; font-size: 13px; }
+
+@media (max-width: 1099.98px) {
+    .inbox { grid-template-columns: minmax(0, 1fr); }
+}
+
+.start-on-phone { display: none; }
+
+@media (max-width: 1099.98px) {
+    .start-on-phone { display: flex; }
+    .next-up { display: none; }
+}
+
+@media (max-width: 599.98px) {
+    .item { flex-wrap: wrap; gap: 8px 12px; }
+    .item:not(.reading) .item-main { flex-basis: 100%; }
+    .item .amount { margin-left: auto; }
+    .item .button { flex: 1 0 100%; }
+    .item.fail .button { flex: 1 1 0; }
+    .tile { padding: 10px 12px; }
+    .tile strong { font-size: 22px; }
+}

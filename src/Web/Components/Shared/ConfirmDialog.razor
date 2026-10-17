@@ -1,0 +1,51 @@
+@* A question that has to be answered before anything is deleted. The backdrop and Escape both mean "no". *@
+<div class="dialog-backdrop" @onclick="Cancel" @onkeydown="OnKeyDown">
+    <div class="dialog panel" role="alertdialog" aria-modal="true" aria-labelledby="dialog-title" @onclick:stopPropagation>
+        <h2 id="dialog-title">@Title</h2>
+        <div class="dialog-body">@ChildContent</div>
+        <div class="dialog-actions">
+            <button type="button" class="button" disabled="@Busy" @onclick="Cancel" @ref="_cancelButton">@CancelText</button>
+            <button type="button" class="button danger" disabled="@Busy" @onclick="Confirm">@ConfirmText</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ElementReference _cancelButton;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string ConfirmText { get; set; } = string.Empty;
+
+    [Parameter]
+    public string CancelText { get; set; } = "Keep it";
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public EventCallback OnConfirm { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    // The safe answer has the focus, so Enter does not delete by accident.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _cancelButton.FocusAsync();
+        }
+    }
+
+    private Task Confirm() => Busy ? Task.CompletedTask : OnConfirm.InvokeAsync();
+
+    private Task Cancel() => Busy ? Task.CompletedTask : OnCancel.InvokeAsync();
+
+    private Task OnKeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? Cancel() : Task.CompletedTask;
+}
