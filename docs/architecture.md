@@ -27,6 +27,7 @@ flowchart LR
 | Decision | Why |
 |---|---|
 | Blazor Web App, Interactive Server | One project, no separate API. Needs a live connection, which phones can drop, so state lives in the database, not the browser. |
+| Upload through `InputFile`, not an HTTP endpoint | Single user and no other client, so the page calls the upload slice directly and gets a result value, not an HTTP status. Files travel over the Blazor circuit in segments. If phone uploads prove unreliable, an endpoint can be added without changing the slice. |
 | PostgreSQL via EF Core, local install | Durable storage for receipts, field records and the queue. |
 | The queue is the receipts table | Status is the queue state. No second source of truth. |
 | Background worker in the same app | A hosted service reads from the database queue, as the BRD requires. Queued and Processing receipts survive a restart. |
@@ -36,8 +37,11 @@ flowchart LR
 | Money stored as exact decimals | No rounding drift in monthly totals. |
 | Transaction number from a PostgreSQL identity column | The database hands out the next number safely under concurrent uploads and never reuses one (NFR-D6). No counter in application code. |
 | Clean Architecture, one feature slice per command or query | Matches the user stories. |
+| Slices are dispatched with Mediator (source-generated), registered as scoped | Pages send a command or query and get a response, with no reflection at run time. Scoped, so a handler may use scoped services. |
+| Database context created per repository call, through `IDbContextFactory` | A Blazor circuit lives as long as the browser tab, so a scoped context would be shared by every page. It is not thread-safe, so the list refresh and an upload at the same time would collide, and it would keep stale tracked entities. A context per call avoids both. A slice that needs one transaction over several steps does it inside a single repository method. |
 | Extraction behind a receipt extractor, which calls an AI gateway | Prompt and parsing are separate from provider access. Changing provider touches only an adapter (NFR-M2). |
 | The gateway does not retry; the worker owns the attempt budget, a setting that starts at 1 | Two retry layers would multiply the attempts and break the configured total (NFR-R1). Starting at 1 means no automatic retry, which limits token use. |
+| The gateway's timeout, rate limit and circuit breaker use `Microsoft.Extensions.Http.Resilience`, with no retry strategy | Standard, tested policies on top of Polly instead of hand-written ones. A call over the rate limit waits, up to its timeout. The timeout grows with the image count, because a long PDF takes longer than a photo. |
 
 ## Components
 
@@ -47,7 +51,7 @@ flowchart LR
 | **Application** | One slice each for upload, list, review, approve, reprocess, delete, monthly totals, CSV export and processing the next receipt. |
 | **Infrastructure** | Database access, image storage, PDF rendering, and the extractor implementation. |
 | **AI gateway** | The only code that talks to model providers. Maps a model name to a provider, applies timeout, rate limit and circuit breaker, and logs usage without receipt content. There is no fallback provider in v1, and one can be added later. |
-| **Web** | Blazor UI, upload and image endpoints, and the hosted worker. |
+| **Web** | Blazor UI (upload through an `InputFile` component), the image and CSV export endpoints, and the hosted worker. |
 | **Eval tool** | Console app that generates the 30 synthetic test receipts and their answer file (see the BRD test set), runs them through the extractor and reports accuracy (NFR-M3). |
 
 Dependencies point inward: Web and Infrastructure → Application → Domain. The gateway knows nothing about receipts.

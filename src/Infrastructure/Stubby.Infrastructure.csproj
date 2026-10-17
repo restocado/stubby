@@ -3,12 +3,20 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="PDFtoImage" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Application\Stubby.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Stubby.Infrastructure.Tests" />
+    <InternalsVisibleTo Include="Stubby.Eval.Tests" />
   </ItemGroup>
 
 </Project>

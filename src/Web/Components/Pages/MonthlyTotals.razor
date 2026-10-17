@@ -1,0 +1,136 @@
+@page "/totals"
+@using System.Globalization
+@using Mediator
+@using Stubby.Application.Abstractions
+@using Stubby.Application.Features.Reports.GetMonthlyTotals
+@inject IMediator Sender
+@inject TimeProvider Clock
+@inject ILogger<MonthlyTotals> Logger
+
+<PageTitle>Monthly totals</PageTitle>
+
+<h1>Monthly totals</h1>
+
+@if (_totals is null)
+{
+    <div class="alert alert-danger" role="alert">Could not load the totals. <a href="totals">Try again</a>.</div>
+}
+else
+{
+    var month = new YearMonth(_totals.Year, _totals.Month);
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        @if (_previous is { } previous)
+        {
+            <a class="btn btn-outline-secondary btn-sm" href="@Link(previous)" rel="prev">&larr; Previous</a>
+        }
+        else
+        {
+            <span class="btn btn-outline-secondary btn-sm disabled" aria-disabled="true">&larr; Previous</span>
+        }
+
+        <strong class="px-2">@MonthName(month)</strong>
+
+        @if (_next is { } next)
+        {
+            <a class="btn btn-outline-secondary btn-sm" href="@Link(next)" rel="next">Next &rarr;</a>
+        }
+        else
+        {
+            <span class="btn btn-outline-secondary btn-sm disabled" aria-disabled="true">Next &rarr;</span>
+        }
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th class="text-end">Receipts</th>
+                    <th class="text-end">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var category in _totals.Categories)
+                {
+                    <tr>
+                        <td>@category.Category.ToString().ToLowerInvariant()</td>
+                        <td class="text-end">@category.Count</td>
+                        <td class="text-end text-nowrap">@Money(category.Total)</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr class="fw-bold">
+                    <td>Total</td>
+                    <td class="text-end">@_totals.GrandCount</td>
+                    <td class="text-end text-nowrap">@Money(_totals.GrandTotal)</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <p class="d-flex flex-wrap gap-3">
+        <a href="@($"api/reports/receipts.csv?year={_totals.Year}&month={_totals.Month}")">Download @MonthName(month) as CSV</a>
+        <a href="api/reports/receipts.csv">Download every approved receipt as CSV</a>
+    </p>
+    <p class="text-muted">Only approved receipts count, by the date on the receipt.</p>
+}
+
+@code {
+    private GetMonthlyTotalsResponse? _totals;
+    private YearMonth? _previous;
+    private YearMonth? _next;
+
+    // Text, and parsed here: a value such as "abc" cannot be bound to a number, and the binding would throw.
+    [SupplyParameterFromQuery(Name = "year")]
+    public string? YearText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "month")]
+    public string? MonthText { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var now = Clock.GetLocalNow();
+        var current = new YearMonth(now.Year, now.Month);
+
+        // A missing or impossible month shows the current one.
+        var requested =
+            int.TryParse(YearText, NumberStyles.None, CultureInfo.InvariantCulture, out var year) && year is >= 1 and <= 9998
+            && int.TryParse(MonthText, NumberStyles.None, CultureInfo.InvariantCulture, out var month) && month is >= 1 and <= 12
+                ? new YearMonth(year, month)
+                : current;
+
+        try
+        {
+            _totals = await Sender.Send(new GetMonthlyTotalsQuery(requested.Year, requested.Month));
+
+            // The months that can be picked run from the first approved receipt to the current month. A receipt dated
+            // after the current month, which approval allows, extends the range to its month.
+            var first = _totals.EarliestMonth is { } earliest && Compare(earliest, current) < 0 ? earliest : current;
+            var last = _totals.LatestMonth is { } latest && Compare(latest, current) > 0 ? latest : current;
+            _previous = Compare(requested, first) > 0 ? AddMonths(requested, -1) : null;
+            _next = Compare(requested, last) < 0 ? AddMonths(requested, 1) : null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load the totals for {Year}-{Month}.", requested.Year, requested.Month);
+            _totals = null;
+        }
+    }
+
+    private static int Compare(YearMonth a, YearMonth b) => ((a.Year * 12) + a.Month).CompareTo((b.Year * 12) + b.Month);
+
+    private static YearMonth AddMonths(YearMonth month, int months)
+    {
+        var index = (month.Year * 12) + (month.Month - 1) + months;
+        return new YearMonth(index / 12, (index % 12) + 1);
+    }
+
+    private static string Link(YearMonth month) => $"totals?year={month.Year}&month={month.Month}";
+
+    private static string MonthName(YearMonth month) =>
+        new DateTime(month.Year, month.Month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+
+    // Two decimals and no currency symbol: no currency is stored.
+    private static string Money(decimal amount) => amount.ToString("F2", CultureInfo.InvariantCulture);
+}

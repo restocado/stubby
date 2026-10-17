@@ -2,6 +2,8 @@ using Stubby.Application;
 using Stubby.Infrastructure;
 using Stubby.Infrastructure.Persistence;
 using Stubby.Web.Components;
+using Stubby.Web.Endpoints;
+using Stubby.Web.Workers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +11,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSingleton(ExtractionWorkerOptions.From(builder.Configuration));
+builder.Services.AddHostedService<ExtractionWorker>();
 
 var app = builder.Build();
 
@@ -30,7 +34,12 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapReceiptEndpoints();
+app.MapReportEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+// Lets the integration tests start the app with WebApplicationFactory.
+public partial class Program;

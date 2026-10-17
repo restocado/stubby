@@ -1,0 +1,6 @@
+# The generated eval test set. Pictures and PDFs are binary, and the answer file always has LF line endings,
+# so that generating it again gives the same bytes on every system.
+testset/*.png binary
+testset/*.jpg binary
+testset/*.pdf binary
+testset/answers.json text eol=lf

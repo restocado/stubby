@@ -4,7 +4,9 @@ Single-user .NET 10 Blazor app that reads receipts with a vision model. See [REA
 
 ## Status
 
-Scaffolded. `docs/` holds the design and `src/` holds empty projects wired per `docs/architecture.md`; no feature code yet. Only architecture tests exist in `tests/`. Build with `dotnet build Stubby.slnx`, test with `dotnet test --solution Stubby.slnx`.
+In progress. Built so far: upload, list receipts, the AI gateway, PDF rendering, the receipt extractor, the process-next-receipt slice and the extraction worker, so an uploaded receipt is read in the background and ends For review, Failed or flagged. The worker starts with the app and processes every Queued receipt with the configured model. Review and approve are built too: `/receipts/{id}` shows the receipt beside its fields, and Approve saves the final values and the field records. Reprocess and delete are built too, on the list and on the review page of a Failed receipt. The reports are built too: `/totals` shows a month's approved totals by category, and `/api/reports/receipts.csv` downloads the approved receipts for Excel. The eval tool's generator is built: `dotnet run --project src/Eval -- generate` writes the 30 invented receipts and `answers.json` to `testset/` (committed, and not to be edited by hand). The eval tool's `run` command is built too: `dotnet run --project src/Eval -- run` reads that set through the real extractor with the app's model and secrets, prints a scored report and writes `eval-report.md`. It sends the receipts to the model provider, so run it on purpose. Everything in the plan is built. What remains is running it against the real model and tuning the prompt from the result. Build with `dotnet build Stubby.slnx`, test with `dotnet test --solution Stubby.slnx`.
+
+`tests/Integration.Tests` runs against a real PostgreSQL. It uses `postgres`/`postgres` on localhost, or the connection string in `STUBBY_TEST_PG` (it must be able to create databases). It creates and drops its own database, and skips when no server is reachable, so look for skipped tests in the summary.
 
 ## Source of truth
 
@@ -34,4 +36,4 @@ Read these before changing behavior. They are consistent with each other, so kee
 
 ## Git
 
-The working branch is `docs`; PRs go to `main`.
+`feat/*` branches are cut from `dev` and merged into `dev` by PR. `dev` is merged into `main` by PR.

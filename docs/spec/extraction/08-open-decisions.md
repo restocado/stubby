@@ -4,14 +4,4 @@
 
 None are decided until the author confirms them.
 
-| # | Question | Blocks | Recommendation |
-|---|---|---|---|
-| 1 | What are the exact prompt and reply format? Neither is written yet. | 02, 05 | JSON with fixed field names, `null` for unreadable fields, `yyyy-MM-dd` dates, no currency symbol. Write the prompt as its own design note. |
-| 2 | Does a call over the rate limit wait or fail fast? | 01 | Wait, up to the timeout. |
-| 3 | What are the default timeout, rate limit and circuit breaker values? | 01 | Pick starting values in settings and tune from the usage logs. A PDF needs a longer timeout than a photo. |
-| 4 | Is one unparseable field a missing field or a failed reply? | 02 | Missing field. Fail only when nothing is usable. |
-| 5 | What DPI for PDF pages? | 03 | About 150 to 200, checked on the eval set. |
-| 6 | Which time zone defines "today" for the date flags? | 04, 05 | The server's local date. |
-| 7 | In what order are requeued receipts processed? | 05 | By `CreatedAt`. Revisit if "reprocess all" delays new uploads. |
-| 8 | Is `MaxAttempts` re-read on every call or only at startup? | 05, 06 | Every call. |
-| 9 | Should the worker pause while the circuit is open? | 06 | No, as decided in the architecture. Watch the usage logs. |
+Decided and moved into the specs: #2 (a call over the rate limit waits, up to the timeout) and #3 (starting timeout, rate limit and circuit values), both in [01-ai-gateway.md](01-ai-gateway.md), and #5 (150 DPI to start, a setting), in [03-pdf-rendering.md](03-pdf-rendering.md). #1 (prompt and reply format) is written up in [docs/extraction-prompt.md](../../extraction-prompt.md) and #4 (one unparseable field is a missing field) is in [02-receipt-extractor.md](02-receipt-extractor.md). "Nothing usable" in #4 is taken to mean merchant, date and total all missing, which fails the reply and makes the receipt Failed. #6 (today is the server's local date), #7 (requeued receipts go in `CreatedAt` order, revisit if "reprocess all" delays new uploads) and #8 (`MaxAttempts` is re-read on every call) are in [05-process-next-receipt.md](05-process-next-receipt.md). Keeping the `SubtotalTaxMismatch` flag for receipts with a tip is noted in [04-flagging-rules.md](04-flagging-rules.md). #9 (the worker does not pause while the circuit is open, as the architecture says, with the usage logs to be watched) is in [06-extraction-worker.md](06-extraction-worker.md). Nothing is open now.
