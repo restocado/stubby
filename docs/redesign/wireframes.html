@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stubby redesign: low-fi wireframes</title>
+<style>
+  :root { --ink: #222; --line: #333; --mid: #bdbdbd; --soft: #e9e9e9; --faint: #f5f5f5; --paper: #fff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px 40px 80px; background: #d9d9d9; color: var(--ink); font: 14px/1.4 "Segoe UI", system-ui, sans-serif; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  h2 { margin: 48px 0 4px; font-size: 20px; }
+  .lead { max-width: 900px; margin: 0 0 8px; color: #444; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 0 0; font-size: 12px; color: #444; }
+  .pair { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; margin: 14px 0 10px; }
+  .notes { max-width: 1100px; margin: 4px 0 0; padding-left: 20px; color: #333; }
+  .notes li { margin: 3px 0; }
+  .label { font-size: 12px; color: #555; margin: 0 0 4px; letter-spacing: .04em; text-transform: uppercase; }
+
+  /* Frames */
+  .desk { width: 1080px; height: 640px; border: 2px solid var(--line); background: var(--paper); display: grid; grid-template-columns: 150px 1fr; }
+  .rail { background: var(--soft); border-right: 2px solid var(--line); padding: 16px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .brand { font-weight: 700; font-size: 16px; margin: 0 6px 14px; }
+  .ni { padding: 7px 10px; border: 2px solid transparent; border-radius: 6px; }
+  .ni.on { border-color: var(--line); background: var(--paper); font-weight: 600; }
+  .ni .n { float: right; font-size: 12px; border: 1.5px solid var(--line); border-radius: 10px; padding: 0 6px; background: var(--paper); }
+  .main { padding: 16px 22px; overflow: hidden; }
+  .phone { width: 340px; height: 660px; border: 2px solid var(--line); border-radius: 24px; background: var(--paper); display: flex; flex-direction: column; overflow: hidden; }
+  .top { padding: 12px 14px; border-bottom: 2px solid var(--line); font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  .body { flex: 1; padding: 12px 14px; overflow: hidden; }
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 2px solid var(--line); background: var(--soft); text-align: center; font-size: 12px; }
+  .tabs div { padding: 9px 2px 8px; }
+  .tabs .on { background: var(--paper); font-weight: 700; border-top: 3px solid var(--line); margin-top: -2px; }
+  .tabs .add { font-weight: 700; }
+
+  /* Parts */
+  .row { display: flex; align-items: center; gap: 10px; }
+  .grow { flex: 1; }
+  .between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .h { font-size: 20px; font-weight: 700; margin: 0 0 10px; }
+  .sub { color: #666; font-size: 12px; }
+  .btn { display: inline-block; border: 2px solid var(--line); border-radius: 7px; padding: 6px 12px; background: var(--paper); white-space: nowrap; }
+  .btn.primary { background: var(--ink); color: #fff; font-weight: 600; }
+  .btn.big { padding: 11px 18px; font-size: 15px; }
+  .btn.small { padding: 2px 8px; font-size: 12px; }
+  .btn.ghost { border-style: dashed; }
+  .chip { display: inline-block; border: 1.5px solid var(--line); border-radius: 12px; padding: 1px 9px; font-size: 12px; background: var(--paper); }
+  .chip.on { background: var(--ink); color: #fff; }
+  .chip.warn { border-style: dashed; font-weight: 600; }
+  .stat { border: 2px solid var(--line); border-radius: 10px; padding: 8px 12px; min-width: 120px; background: var(--faint); }
+  .stat b { display: block; font-size: 22px; }
+  .card { display: flex; align-items: center; gap: 12px; border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px; margin: 0 0 8px; background: var(--paper); }
+  .card .t { font-weight: 600; }
+  .thumb { flex: none; width: 44px; height: 56px; border: 2px solid var(--line); background: linear-gradient(to top right, transparent calc(50% - 1px), var(--mid) 50%, transparent calc(50% + 1px)), linear-gradient(to bottom right, transparent calc(50% - 1px), var(--mid) 50%, transparent calc(50% + 1px)); }
+  .amt { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .field { margin: 0 0 10px; }
+  .field label { display: block; font-size: 12px; color: #555; margin-bottom: 2px; }
+  .input { border: 2px solid var(--line); border-radius: 6px; padding: 7px 10px; min-height: 36px; background: var(--paper); }
+  .input.big { font-size: 20px; font-weight: 600; min-height: 46px; }
+  .viewer { position: relative; border: 2px solid var(--line); background: var(--faint); height: 100%; min-height: 220px; }
+  .viewer .paper { position: absolute; inset: 24px 18% 24px; border: 2px solid var(--line); background: var(--paper); background-image: repeating-linear-gradient(transparent 0 15px, var(--soft) 15px 17px); }
+  .viewer .tools { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .viewer .tools .btn { padding: 1px 8px; font-weight: 700; }
+  .banner { border: 2px dashed var(--line); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px; background: var(--faint); }
+  .banner.err { border-style: solid; }
+  .drop { border: 3px dashed var(--line); border-radius: 14px; padding: 34px 20px; text-align: center; background: var(--faint); }
+  .progress { height: 10px; border: 2px solid var(--line); border-radius: 6px; width: 120px; overflow: hidden; }
+  .progress i { display: block; height: 100%; background: var(--ink); }
+  .bar { height: 16px; border: 2px solid var(--line); border-radius: 4px; background: var(--faint); flex: 1; }
+  .bar i { display: block; height: 100%; background: var(--mid); }
+  .more { font-weight: 800; letter-spacing: .1em; }
+  hr { border: 0; border-top: 2px solid var(--soft); margin: 10px 0; }
+  .two { display: grid; grid-template-columns: 1.05fr 1fr; gap: 20px; height: 470px; }
+  .strike { text-decoration: line-through; color: #888; }
+</style>
+</head>
+<body>
+
+<h1>Stubby redesign: low-fidelity wireframes</h1>
+<p class="lead">
+  Grey boxes only. The point is where things go and what each screen is for, not how it looks. Each screen is shown on a
+  desktop and on a phone, because Stubby is used on both: photograph a receipt on the go, check it at a desk.
+  The screenshots of today's app are in <code>screenshots/</code>, and the reasoning is in <code>README.md</code>.
+</p>
+<div class="legend">
+  <span><span class="chip on">dark</span> selected or primary</span>
+  <span><span class="chip warn">dashed</span> needs your attention</span>
+  <span><span class="thumb" style="display:inline-block;width:14px;height:18px;vertical-align:middle"></span> a picture of the receipt</span>
+  <span><span class="more">&middot;&middot;&middot;</span> a menu that holds the rare or risky actions</span>
+</div>
+
+<!-- ============================ 1. INBOX ============================ -->
+<h2>1. Inbox (the new home)</h2>
+<div class="sub">Replaces the "Hello, world!" page. It answers one question: what needs me right now?</div>
+<div class="pair">
+  <div>
+    <p class="label">Desktop</p>
+    <div class="desk">
+      <div class="rail">
+        <div class="brand">Stubby</div>
+        <div class="ni on">Inbox <span class="n">3</span></div>
+        <div class="ni">Receipts</div>
+        <div class="ni">Totals</div>
+        <div style="margin-top:auto"><span class="btn primary" style="display:block;text-align:center">+ Add receipts</span></div>
+      </div>
+      <div class="main">
+        <div class="between"><div class="h">Inbox</div><span class="sub">Updates by itself while receipts are being read</span></div>
+        <div class="row" style="margin-bottom:14px">
+          <div class="stat"><b>3</b>to review</div>
+          <div class="stat"><b>1</b>could not be read</div>
+          <div class="stat"><b>2</b>being read now</div>
+          <div class="stat" style="margin-left:auto"><b>288.42</b>approved this month &rarr;</div>
+        </div>
+        <div class="row" style="margin-bottom:8px"><span class="chip on">To review 3</span><span class="chip">Could not be read 1</span><span class="chip">Reading 2</span></div>
+        <div class="card"><div class="thumb"></div><div><div class="t">Brightwire Electronics</div><div class="sub">14 Sep 2026</div></div><span class="chip warn">Total looks large</span><div class="amt">3,697.54</div><span class="btn primary small">Review</span></div>
+        <div class="card"><div class="thumb"></div><div><div class="t">Juniper Bean Coffee</div><div class="sub">no date found</div></div><span class="chip warn">Date missing</span><div class="amt">37.00</div><span class="btn primary small">Review</span></div>
+        <div class="card"><div class="thumb"></div><div><div class="t">Paper Moon Bookshop</div><div class="sub">8 Feb 2026 &middot; PDF, 3 pages</div></div><span class="sub" style="margin-left:6px"></span><div class="amt">737.43</div><span class="btn primary small">Review</span></div>
+        <div class="card" style="border-style:dashed"><div class="thumb"></div><div><div class="t">28-blurry-restaurant.jpg</div><div class="sub">Could not be read: the provider was busy</div></div><div class="amt"></div><span class="btn small">Try again</span><span class="btn small">Type it in</span></div>
+        <div class="sub" style="margin-top:6px">Reading now: 2 receipts &middot; <u>See all receipts</u></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p class="label">Phone</p>
+    <div class="phone">
+      <div class="top"><span>Inbox</span><span class="more">&middot;&middot;&middot;</span></div>
+      <div class="body">
+        <div class="row" style="margin-bottom:10px"><div class="stat" style="flex:1;min-width:0"><b>3</b>to review</div><div class="stat" style="flex:1;min-width:0"><b>1</b>failed</div><div class="stat" style="flex:1;min-width:0"><b>2</b>reading</div></div>
+        <div class="card"><div class="thumb"></div><div><div class="t">Brightwire Electronics</div><div class="sub">14 Sep &middot; total looks large</div></div><div class="amt">3,697.54</div></div>
+        <div class="card"><div class="thumb"></div><div><div class="t">Juniper Bean Coffee</div><div class="sub">no date found</div></div><div class="amt">37.00</div></div>
+        <div class="card"><div class="thumb"></div><div><div class="t">Paper Moon Bookshop</div><div class="sub">8 Feb &middot; PDF</div></div><div class="amt">737.43</div></div>
+        <div class="card" style="border-style:dashed"><div class="thumb"></div><div><div class="t">Could not be read</div><div class="sub">tap to try again</div></div></div>
+        <div class="banner" style="text-align:center">Approved this month: <b>288.42</b> &rarr;</div>
+      </div>
+      <div class="tabs"><div class="on">Inbox</div><div>Receipts</div><div class="add">+ Add</div><div>Totals</div></div>
+    </div>
+  </div>
+</div>
+<ul class="notes">
+  <li>The start page is the work queue, not a menu: receipts to review come first, then ones that failed, then a count of what is still being read.</li>
+  <li>Each card leads with what you recognise (merchant, date, total) and a picture, not a transaction number and a file name. The reason for a flag is in words on the card.</li>
+  <li>"Add receipts" is the primary action, always in reach: bottom of the rail on desktop, the middle tab on a phone.</li>
+  <li>Failed receipts offer the two real choices right there: try reading again, or type it in.</li>
+</ul>
+
+<!-- ============================ 2. ADD ============================ -->
+<h2>2. Add receipts</h2>
+<div class="sub">One big target, camera first on a phone, and a clear way onwards when the files are in.</div>
+<div class="pair">
+  <div>
+    <p class="label">Desktop</p>
+    <div class="desk">
+      <div class="rail">
+        <div class="brand">Stubby</div>
+        <div class="ni">Inbox <span class="n">3</span></div>
+        <div class="ni">Receipts</div>
+        <div class="ni">Totals</div>
+        <div style="margin-top:auto"><span class="btn primary" style="display:block;text-align:center;opacity:.6">+ Add receipts</span></div>
+      </div>
+      <div class="main">
+        <div class="h">Add receipts</div>
+        <div class="drop"><div style="font-size:18px;font-weight:700">Drop receipts here</div><div class="sub" style="margin:4px 0 12px">JPG, PNG or PDF, up to 10 MB each. Several at once is fine.</div><span class="btn big">Choose files</span></div>
+        <div style="margin-top:14px">
+          <div class="card"><div class="thumb"></div><div class="grow"><div class="t">maple-pine-cafe.png</div><div class="sub">Added. Being read now.</div></div><span class="chip on">Added</span></div>
+          <div class="card"><div class="thumb"></div><div class="grow"><div class="t">northgate-hardware.jpg</div><div class="progress"><i style="width:60%"></i></div></div><span class="chip">Sending&hellip;</span></div>
+          <div class="card" style="border-style:dashed"><div class="thumb"></div><div class="grow"><div class="t">quick-fuel.pdf</div><div class="sub">Already added as TXN-000003</div></div><span class="btn small">Open it</span></div>
+          <div class="card" style="border-style:dashed"><div class="thumb"></div><div class="grow"><div class="t">notes.txt</div><div class="sub">Not supported. Use a JPG, PNG or PDF file.</div></div><span class="chip warn">Skipped</span></div>
+        </div>
+        <div class="between" style="margin-top:6px"><span class="sub">2 added, 2 skipped</span><span class="btn primary">Go to inbox &rarr;</span></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p class="label">Phone</p>
+    <div class="phone">
+      <div class="top"><span>Add receipts</span><span class="more">&middot;&middot;&middot;</span></div>
+      <div class="body">
+        <span class="btn primary big" style="display:block;text-align:center;padding:26px 10px;font-size:18px">&#9673; Take a photo</span>
+        <span class="btn big" style="display:block;text-align:center;margin:10px 0 14px">Choose from photos or files</span>
+        <div class="card"><div class="thumb"></div><div class="grow"><div class="t">Photo 1</div><div class="sub">Added</div></div><span class="chip on">&#10003;</span></div>
+        <div class="card"><div class="thumb"></div><div class="grow"><div class="t">Photo 2</div><div class="progress"><i style="width:60%"></i></div></div></div>
+        <div class="card" style="border-style:dashed"><div class="thumb"></div><div class="grow"><div class="t">Photo 3</div><div class="sub">Already added as TXN-000003</div></div></div>
+        <span class="btn primary" style="display:block;text-align:center;margin-top:12px">Go to inbox &rarr;</span>
+      </div>
+      <div class="tabs"><div>Inbox</div><div>Receipts</div><div class="add on">+ Add</div><div>Totals</div></div>
+    </div>
+  </div>
+</div>
+<ul class="notes">
+  <li>On a phone the first button opens the camera. Choosing from the library is second.</li>
+  <li>Every file gets its own row with a thumbnail and a plain result. A duplicate links to the receipt that already exists. A rejected file says why and is skipped, without hiding the others.</li>
+  <li>When the files are in, there is one obvious next step, "Go to inbox", so the screen is not a dead end.</li>
+</ul>
+
+<!-- ============================ 3. RECEIPTS ============================ -->
+<h2>3. All receipts</h2>
+<div class="sub">The archive: find a receipt by merchant, month or status. Rows are for scanning, cards on a phone.</div>
+<div class="pair">
+  <div>
+    <p class="label">Desktop</p>
+    <div class="desk">
+      <div class="rail">
+        <div class="brand">Stubby</div>
+        <div class="ni">Inbox <span class="n">3</span></div>
+        <div class="ni on">Receipts</div>
+        <div class="ni">Totals</div>
+        <div style="margin-top:auto"><span class="btn primary" style="display:block;text-align:center">+ Add receipts</span></div>
+      </div>
+      <div class="main">
+        <div class="between"><div class="h">Receipts</div><div class="input" style="width:230px;min-height:32px;padding:4px 10px">Search merchant&hellip;</div></div>
+        <div class="row" style="margin-bottom:10px"><span class="chip on">All 12</span><span class="chip">To review 4</span><span class="chip">Failed 1</span><span class="chip">Approved 5</span><span class="sub" style="margin-left:auto">Month: <span class="btn small">All time &#9662;</span></span></div>
+        <div class="card" style="font-size:12px;color:#555;border-style:dotted;padding:3px 10px"><div style="width:44px"></div><div style="width:240px">Merchant</div><div style="width:100px">Date</div><div style="width:110px">Category</div><div style="width:120px">Status</div><div class="amt" style="width:90px;font-weight:400">Total</div><div style="width:34px"></div></div>
+        <div class="card"><div class="thumb" style="height:34px"></div><div style="width:240px"><div class="t">Paper Moon Bookshop</div><div class="sub">TXN-000009</div></div><div style="width:100px">8 Feb 2026</div><div style="width:110px" class="sub">&mdash;</div><div style="width:120px"><span class="chip on">To review</span></div><div class="amt" style="width:90px">737.43</div><span class="more">&middot;&middot;&middot;</span></div>
+        <div class="card"><div class="thumb" style="height:34px"></div><div style="width:240px"><div class="t">Brightwire Electronics</div><div class="sub">TXN-000007</div></div><div style="width:100px">14 Sep 2026</div><div style="width:110px" class="sub">&mdash;</div><div style="width:120px"><span class="chip on">To review</span> <span class="chip warn">!</span></div><div class="amt" style="width:90px">3,697.54</div><span class="more">&middot;&middot;&middot;</span></div>
+        <div class="card"><div class="thumb" style="height:34px"></div><div style="width:240px"><div class="t">Little Dumpling Kitchen</div><div class="sub">TXN-000005</div></div><div style="width:100px">26 Mar 2026</div><div style="width:110px">Dining</div><div style="width:120px"><span class="chip">Approved</span></div><div class="amt" style="width:90px">42.75</div><span class="more">&middot;&middot;&middot;</span></div>
+        <div class="card"><div class="thumb" style="height:34px"></div><div style="width:240px"><div class="t">Maple &amp; Pine Cafe</div><div class="sub">TXN-000001</div></div><div style="width:100px">25 Mar 2026</div><div style="width:110px">Dining</div><div style="width:120px"><span class="chip">Approved</span></div><div class="amt" style="width:90px">27.20</div><span class="more">&middot;&middot;&middot;</span></div>
+        <div class="between" style="margin-top:8px"><span class="sub">Showing 1&ndash;25 of 41</span><span><span class="btn small">&larr; Newer</span> <span class="btn small">Older &rarr;</span></span></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p class="label">Phone</p>
+    <div class="phone">
+      <div class="top"><span>Receipts</span><span class="more">&middot;&middot;&middot;</span></div>
+      <div class="body">
+        <div class="input" style="min-height:34px;padding:5px 10px;margin-bottom:8px">Search merchant&hellip;</div>
+        <div class="row" style="margin-bottom:10px;flex-wrap:wrap;gap:6px"><span class="chip on">All</span><span class="chip">To review</span><span class="chip">Failed</span><span class="chip">Approved</span></div>
+        <div class="card"><div class="thumb" style="height:44px;width:36px"></div><div><div class="t">Paper Moon Bookshop</div><div class="sub">8 Feb &middot; <b>To review</b></div></div><div class="amt">737.43</div></div>
+        <div class="card"><div class="thumb" style="height:44px;width:36px"></div><div><div class="t">Brightwire Electronics</div><div class="sub">14 Sep &middot; <b>To review</b> &middot; !</div></div><div class="amt">3,697.54</div></div>
+        <div class="card"><div class="thumb" style="height:44px;width:36px"></div><div><div class="t">Little Dumpling Kitchen</div><div class="sub">26 Mar &middot; Dining</div></div><div class="amt">42.75</div></div>
+        <div class="card"><div class="thumb" style="height:44px;width:36px"></div><div><div class="t">Maple &amp; Pine Cafe</div><div class="sub">25 Mar &middot; Dining</div></div><div class="amt">27.20</div></div>
+        <div class="card"><div class="thumb" style="height:44px;width:36px"></div><div><div class="t">Quick Fuel Station</div><div class="sub">15 Mar &middot; Transport</div></div><div class="amt">62.99</div></div>
+        <div class="sub" style="text-align:center">Load older receipts</div>
+      </div>
+      <div class="tabs"><div>Inbox</div><div class="on">Receipts</div><div class="add">+ Add</div><div>Totals</div></div>
+    </div>
+  </div>
+</div>
+<ul class="notes">
+  <li>The merchant leads, with the date, category and an amount lined up on the right. The transaction number is small, and the file name is gone from the list.</li>
+  <li>Status is one chip, and a flag is a small mark on it. The table has no repeated Delete buttons: reprocess and delete live in the row's menu, behind a confirmation.</li>
+  <li>Search, status chips and a month filter replace scrolling. Phones get cards, so nothing is cut off at the right edge.</li>
+  <li>"Reprocess all failed" is shown in the Failed filter, where it makes sense, not at the top of every list.</li>
+</ul>
+
+<!-- ============================ 4. REVIEW ============================ -->
+<h2>4. Review a receipt</h2>
+<div class="sub">Check what was read against the receipt, fix it, approve, and move to the next one without going back to a list.</div>
+<div class="pair">
+  <div>
+    <p class="label">Desktop</p>
+    <div class="desk">
+      <div class="rail">
+        <div class="brand">Stubby</div>
+        <div class="ni on">Inbox <span class="n">3</span></div>
+        <div class="ni">Receipts</div>
+        <div class="ni">Totals</div>
+        <div style="margin-top:auto"><span class="btn primary" style="display:block;text-align:center">+ Add receipts</span></div>
+      </div>
+      <div class="main">
+        <div class="between" style="margin-bottom:8px"><span class="btn small">&larr; Inbox</span><span class="sub">Receipt 1 of 3 to review &nbsp; <span class="btn small">&lsaquo;</span> <span class="btn small">&rsaquo;</span></span><span class="more">&middot;&middot;&middot;</span></div>
+        <div class="between"><div class="h" style="margin:0">Brightwire Electronics</div><span class="sub">TXN-000007 &middot; 29-overlimit-invoice.png</span></div>
+        <div class="banner" style="margin-top:8px"><b>Check this one:</b> the total is unusually large (3,697.54).</div>
+        <div class="two">
+          <div class="viewer"><div class="paper"></div><div class="tools"><span class="btn">+</span><span class="btn">&minus;</span><span class="btn">&#8635;</span><span class="btn" style="font-size:11px">Fit</span></div></div>
+          <div>
+            <div class="field"><label>Merchant</label><div class="input">Brightwire Electronics</div></div>
+            <div class="row"><div class="field grow"><label>Date</label><div class="input">14 Sep 2026</div></div><div class="field grow"><label>Total</label><div class="input big" style="text-align:right">3,697.54</div></div></div>
+            <div class="field"><label>Category</label><div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip">groceries</span><span class="chip">dining</span><span class="chip">transport</span><span class="chip">utilities</span><span class="chip on">shopping</span><span class="chip">health</span><span class="chip">entertainment</span><span class="chip">other</span></div></div>
+            <hr>
+            <div class="row"><span class="btn primary big">Approve &amp; next &rarr;</span><span class="btn big">Approve</span><span class="btn ghost">Skip</span></div>
+            <div class="sub" style="margin-top:8px">Nothing is saved until you approve. <u>Show what was read</u> (Total 3,697.54, Date 14 Sep 2026)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p class="label">Phone</p>
+    <div class="phone">
+      <div class="top"><span>&larr; 1 of 3</span><span class="more">&middot;&middot;&middot;</span></div>
+      <div class="body" style="padding-bottom:0">
+        <div class="t" style="font-size:17px;font-weight:700">Brightwire Electronics</div>
+        <div class="banner" style="margin:8px 0"><b>Check:</b> total is unusually large</div>
+        <div class="viewer" style="height:170px;min-height:0"><div class="paper" style="inset:14px 22%"></div><div class="tools"><span class="btn" style="padding:0 7px">+</span><span class="btn" style="padding:0 7px">&minus;</span></div></div>
+        <div class="field" style="margin-top:10px"><label>Merchant</label><div class="input">Brightwire Electronics</div></div>
+        <div class="row"><div class="field grow"><label>Date</label><div class="input">14 Sep 2026</div></div><div class="field grow"><label>Total</label><div class="input" style="text-align:right;font-weight:700">3,697.54</div></div></div>
+        <div class="field"><label>Category</label><div class="row" style="flex-wrap:wrap;gap:5px"><span class="chip">groceries</span><span class="chip">dining</span><span class="chip">transport</span><span class="chip on">shopping</span><span class="chip">more&hellip;</span></div></div>
+      </div>
+      <div style="border-top:2px solid var(--line);padding:10px 14px;background:var(--soft)"><span class="btn primary" style="display:block;text-align:center">Approve &amp; next &rarr;</span></div>
+    </div>
+  </div>
+</div>
+<ul class="notes">
+  <li><b>Approve &amp; next</b> is the primary action: a pile of receipts is a loop, and today every approval drops you back at the list. Plain Approve still exists, and so does Skip.</li>
+  <li>The receipt gets real room and zoom, rotate and fit controls, because blurry and tilted photos need to be inspected. Today the picture is small and cannot be zoomed.</li>
+  <li>The total is large and right-aligned, with a thousands separator. The category is a row of chips, so it is one tap and not a dropdown. The date shows a month name and not <code>09/14/2026</code>.</li>
+  <li>Why it was flagged is a short line above the form. What the model read stays one click away, so a correction is visible.</li>
+  <li>Delete is not on the page: it is in the menu, with a confirmation. On a phone Approve sticks to the bottom edge.</li>
+</ul>
+
+<!-- ============================ 5. FAILED ============================ -->
+<h2>5. A receipt that could not be read</h2>
+<div class="sub">Two clear paths instead of an empty form under an error.</div>
+<div class="pair">
+  <div>
+    <p class="label">Desktop</p>
+    <div class="desk">
+      <div class="rail">
+        <div class="brand">Stubby</div>
+        <div class="ni on">Inbox <span class="n">3</span></div>
+        <div class="ni">Receipts</div>
+        <div class="ni">Totals</div>
+        <div style="margin-top:auto"><span class="btn primary" style="display:block;text-align:center">+ Add receipts</span></div>
+      </div>
+      <div class="main">
+        <div class="between" style="margin-bottom:8px"><span class="btn small">&larr; Inbox</span><span class="more">&middot;&middot;&middot;</span></div>
+        <div class="h">Could not be read</div>
+        <div class="banner err"><b>The provider was busy (HTTP 503).</b> Nothing is wrong with the receipt. You can try again, or type it in yourself.<div class="row" style="margin-top:8px"><span class="btn primary">Try reading again</span><span class="btn">Type it in myself</span></div></div>
+        <div class="two" style="grid-template-columns:1.4fr 1fr;height:380px">
+          <div class="viewer"><div class="paper" style="inset:20px 24%"></div><div class="tools"><span class="btn">+</span><span class="btn">&minus;</span><span class="btn">&#8635;</span></div></div>
+          <div style="opacity:.55">
+            <div class="field"><label>Merchant</label><div class="input"></div></div>
+            <div class="field"><label>Date</label><div class="input"></div></div>
+            <div class="field"><label>Total</label><div class="input big"></div></div>
+            <div class="sub">The form opens when you choose "Type it in myself".</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p class="label">Phone</p>
+    <div class="phone">
+      <div class="top"><span>&larr; Could not be read</span><span class="more">&middot;&middot;&middot;</span></div>
+      <div class="body">
+        <div class="banner err"><b>The provider was busy.</b> The receipt is fine.</div>
+        <div class="viewer" style="height:230px;min-height:0"><div class="paper" style="inset:16px 22%"></div></div>
+        <div class="sub" style="margin-top:12px">Choose what to do:</div>
+      </div>
+      <div style="border-top:2px solid var(--line);padding:10px 14px;background:var(--soft)"><span class="btn primary" style="display:block;text-align:center;margin-bottom:8px">Try reading again</span><span class="btn" style="display:block;text-align:center">Type it in myself</span></div>
+    </div>
+  </div>
+</div>
+<ul class="notes">
+  <li>The message says what happened in plain words, and that the receipt itself is fine when that is true. "Try again" is the first button, because it is the usual fix.</li>
+  <li>The empty form is hidden until you ask for it. Today a Failed receipt shows four empty fields and the Approve button straight away.</li>
+</ul>
+
+<!-- ============================ 6. TOTALS ============================ -->
+<h2>6. Totals</h2>
+<div class="sub">Where the money went this month, as bars, with a way into the receipts behind each number.</div>
+<div class="pair">
+  <div>
+    <p class="label">Desktop</p>
+    <div class="desk">
+      <div class="rail">
+        <div class="brand">Stubby</div>
+        <div class="ni">Inbox <span class="n">3</span></div>
+        <div class="ni">Receipts</div>
+        <div class="ni on">Totals</div>
+        <div style="margin-top:auto"><span class="btn primary" style="display:block;text-align:center">+ Add receipts</span></div>
+      </div>
+      <div class="main">
+        <div class="between"><div class="row"><span class="btn">&lsaquo;</span><div class="h" style="margin:0">March 2026 &#9662;</div><span class="btn">&rsaquo;</span></div><span class="btn">Export CSV &#9662;</span></div>
+        <div class="row" style="margin:14px 0 6px"><div style="font-size:40px;font-weight:800">288.42</div><div class="sub">across 5 approved receipts</div></div>
+        <div class="sub" style="margin-bottom:10px">&uarr; 12% on February (257.61)</div>
+        <div class="row" style="margin:8px 0"><div style="width:120px;font-weight:600">groceries</div><div class="bar"><i style="width:32%"></i></div><div class="amt" style="width:80px">93.58</div><span class="sub">1 &rsaquo;</span></div>
+        <div class="row" style="margin:8px 0"><div style="width:120px;font-weight:600">dining</div><div class="bar"><i style="width:24%"></i></div><div class="amt" style="width:80px">69.95</div><span class="sub">2 &rsaquo;</span></div>
+        <div class="row" style="margin:8px 0"><div style="width:120px;font-weight:600">transport</div><div class="bar"><i style="width:22%"></i></div><div class="amt" style="width:80px">62.99</div><span class="sub">1 &rsaquo;</span></div>
+        <div class="row" style="margin:8px 0"><div style="width:120px;font-weight:600">shopping</div><div class="bar"><i style="width:21%"></i></div><div class="amt" style="width:80px">61.90</div><span class="sub">1 &rsaquo;</span></div>
+        <div class="sub" style="margin-top:14px">4 categories had nothing this month. <u>Show them</u></div>
+        <hr>
+        <div class="sub">12 months &nbsp;<span style="display:inline-block;width:260px;height:26px;border:2px solid var(--line);vertical-align:middle;background:repeating-linear-gradient(90deg,var(--mid) 0 14px,transparent 14px 22px)"></span></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p class="label">Phone</p>
+    <div class="phone">
+      <div class="top"><span>Totals</span><span class="btn small">CSV</span></div>
+      <div class="body">
+        <div class="between" style="margin-bottom:8px"><span class="btn">&lsaquo;</span><b style="font-size:17px">March 2026 &#9662;</b><span class="btn">&rsaquo;</span></div>
+        <div style="font-size:38px;font-weight:800;text-align:center">288.42</div>
+        <div class="sub" style="text-align:center;margin-bottom:12px">5 approved receipts &middot; &uarr; 12% on February</div>
+        <div style="margin:10px 0"><div class="between"><b>groceries</b><span class="amt">93.58</span></div><div class="bar"><i style="width:32%"></i></div></div>
+        <div style="margin:10px 0"><div class="between"><b>dining</b><span class="amt">69.95</span></div><div class="bar"><i style="width:24%"></i></div></div>
+        <div style="margin:10px 0"><div class="between"><b>transport</b><span class="amt">62.99</span></div><div class="bar"><i style="width:22%"></i></div></div>
+        <div style="margin:10px 0"><div class="between"><b>shopping</b><span class="amt">61.90</span></div><div class="bar"><i style="width:21%"></i></div></div>
+        <div class="sub" style="text-align:center;margin-top:14px">4 categories had nothing. <u>Show them</u></div>
+      </div>
+      <div class="tabs"><div>Inbox</div><div>Receipts</div><div class="add">+ Add</div><div class="on">Totals</div></div>
+    </div>
+  </div>
+</div>
+<ul class="notes">
+  <li>The month total is the first thing you see, big, with a plain comparison to last month. Categories become bars, largest first.</li>
+  <li>Categories with nothing are tucked away. Today every month shows eight rows, and most of them are zeros.</li>
+  <li>Tapping a category opens All receipts already filtered to that month and category, so a number can always be checked against its receipts.</li>
+  <li>The month name opens a picker, so a jump to last August is one step and not many Previous clicks. The CSV is one button, for this month or for everything.</li>
+</ul>
+
+<!-- ============================ MENU / CONFIRM ============================ -->
+<h2>7. The small things that go with these screens</h2>
+<div class="pair">
+  <div style="width:330px">
+    <p class="label">Row menu</p>
+    <div class="card" style="display:block"><div class="between"><div class="t">Little Dumpling Kitchen</div><span class="more">&middot;&middot;&middot;</span></div>
+      <div style="border:2px solid var(--line);border-radius:8px;margin:8px 0 0 120px;width:170px;background:var(--paper)"><div style="padding:6px 10px">Open</div><div style="padding:6px 10px;border-top:2px solid var(--soft)"><b>Delete&hellip;</b></div></div>
+      <div class="sub" style="margin-top:8px">"Read it again" is added for receipts that could not be read, and only for those.</div></div>
+  </div>
+  <div style="width:330px">
+    <p class="label">Delete confirmation</p>
+    <div class="banner err" style="margin:0"><b>Delete Little Dumpling Kitchen?</b><div class="sub" style="margin:4px 0 8px">The picture is removed and it no longer counts in totals. This cannot be undone.</div><div class="row"><span class="btn primary">Delete</span><span class="btn">Keep it</span></div></div>
+  </div>
+  <div style="width:330px">
+    <p class="label">After approving</p>
+    <div class="banner" style="margin:0;border-style:solid"><b>&#10003; Brightwire Electronics approved</b> &middot; 3,697.54 in shopping<div class="sub" style="margin-top:4px">2 left to review &middot; <u>Open it</u></div></div>
+  </div>
+  <div style="width:330px">
+    <p class="label">Nothing to review</p>
+    <div class="drop" style="padding:22px"><b>All caught up</b><div class="sub" style="margin:4px 0 10px">Nothing is waiting for you.</div><span class="btn primary">+ Add receipts</span></div>
+  </div>
+</div>
+<ul class="notes">
+  <li>Risky actions sit in a menu and always ask first, with the consequence written out. Approving gives clear feedback, because it is one tap and it locks the receipt: an approved receipt can never be edited, only deleted, so there is no undo to offer.</li>
+  <li>Empty states point at the next step, instead of showing an empty table.</li>
+</ul>
+
+</body>
+</html>
