@@ -1,7 +1,7 @@
 # Get Receipt For Review
 
 **Status:** Draft  
-**Location:** `Application/Features/Receipts/GetReceiptForReview/`: `GetReceiptForReviewQuery`, `GetReceiptForReviewQueryHandler`, `GetReceiptForReviewResponse`. And `Application/Features/Receipts/GetReceiptImage/`: `GetReceiptImageQuery`, `GetReceiptImageQueryHandler`. Image endpoint in Web: `GET /api/receipts/{id}/image`.  
+**Location:** `Application/Features/Receipts/GetReceiptForReview/`: `GetReceiptForReviewQuery`, `GetReceiptForReviewQueryHandler`, `GetReceiptForReviewResponse`. And `Application/Features/Receipts/GetReceiptImage/`: `GetReceiptImageQuery`, `GetReceiptImageQueryHandler`, `GetReceiptImageResponse`. Both are Mediator queries that use `IReceiptRepository.FindByIdAsync`, and the image one also `IImageStore.ReadAsync`. Image endpoint in Web (`Web/Endpoints/ReceiptEndpoints.cs`): `GET /api/receipts/{id:guid}/image`. The review page is `Web/Components/Pages/ReviewReceipt.razor` at `/receipts/{id}`.  
 **Depends on:** 01-domain-model, 02-persistence.
 
 ## Scope
@@ -10,9 +10,10 @@ Return what the review screen needs, and serve the receipt file.
 
 ## Behavior
 
-- Unknown id: not found. Queued or Processing: conflict (locked). ForReview, Failed and Approved return data.
-- Response: `Id`, `TransactionNo`, `Status`, `OriginalFileName`, `ContentType`, `IsFlagged`, `FlagReasons` (list), extracted merchant, date and total. Approved also returns final values and category. Failed also returns `LastError`.
-- The image endpoint streams the stored file inline with its content type and `X-Content-Type-Options: nosniff`. Same locking rules. It looks up `ImagePath` by id and never takes a path from the caller.
+- Both queries return a result value: `NotFound` for an unknown id, `Locked` for Queued or Processing, and `Found` for ForReview, Failed and Approved. The query slices know nothing about HTTP. Only the image endpoint turns them into 404, 409 and 200.
+- Response: `Id`, `TransactionNo`, `Status`, `OriginalFileName`, `ContentType`, `IsFlagged`, `FlagReasons` (a list of `FlagReason`, with any name this version does not know skipped), extracted merchant, date and total. Approved also returns final values and category. Failed also returns `LastError`.
+- The image endpoint sends the stored file inline with its stored content type, `X-Content-Type-Options: nosniff` and `Cache-Control: private, no-cache`. Same locking rules. It looks up `ImagePath` by id and never takes a path from the caller. A missing file, or a stored path the image store refuses because it is outside the storage root, is `NotFound`, and is logged.
+- **Review page:** shows a "Back to the receipts" link above everything, which goes to the list for every receipt that opens, then the transaction number as a heading, the file name, the image (or, for a PDF, an `<iframe>` with an "Open the PDF in a new tab" link), and the form. A ForReview receipt starts with the extracted values and no category. A Failed receipt starts empty, with its last error shown, as a manual entry. A flagged receipt shows a banner that lists each reason in words. An Approved receipt shows its final values and category as text, with no inputs and no approve button. A receipt that is still being read, and an unknown one, each show a short message with a link back to the list.
 
 ## Acceptance criteria
 
@@ -20,8 +21,8 @@ Return what the review screen needs, and serve the receipt file.
 - ForReview returns extracted fields, flag and reasons.
 - Failed returns null extracted fields and `LastError`.
 - Approved returns final values and the UI shows no edit controls.
-- Queued and Processing return conflict, for both the query and the image.
-- Unknown id returns not found.
-- The image bytes equal the uploaded bytes, with the right content type.
+- Queued and Processing return `Locked` for both the query and the image, and the image endpoint answers 409.
+- An unknown id returns `NotFound`, and the image endpoint answers 404. So does anything in the route that is not a GUID.
+- The image bytes equal the uploaded bytes, with the right content type, for a PNG and a PDF.
 - No parameter accepts a path, and a stored path outside the storage root is never served.
 - Both load in under 2 seconds for a single-page receipt (NFR-P4).

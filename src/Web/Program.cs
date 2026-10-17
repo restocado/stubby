@@ -2,6 +2,7 @@ using Stubby.Application;
 using Stubby.Infrastructure;
 using Stubby.Infrastructure.Persistence;
 using Stubby.Web.Components;
+using Stubby.Web.Endpoints;
 using Stubby.Web.Workers;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,7 +34,11 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapReceiptEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+// Lets the integration tests start the app with WebApplicationFactory.
+public partial class Program;

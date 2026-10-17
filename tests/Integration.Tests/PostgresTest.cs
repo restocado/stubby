@@ -1,6 +1,7 @@
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Stubby.Application.Abstractions;
+using Stubby.Application.Features.Extraction.ProcessNextReceipt;
 using Stubby.Application.Features.Receipts.UploadReceipt;
 using Stubby.Domain.Receipts;
 
@@ -36,13 +37,22 @@ public abstract class PostgresTest(PostgresFixture fixture) : IAsyncLifetime
         InScopeAsync(sp => sp.GetRequiredService<IReceiptRepository>().TryAddAsync(receipt, Token));
 
     /// <summary>Uploads a small PNG with bytes of its own through the real upload handler. Returns the new receipt's id.</summary>
-    protected async Task<Guid> UploadAsync()
+    protected Task<Guid> UploadAsync() =>
+        UploadAsync(
+            [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, (byte)Interlocked.Increment(ref _uploads)],
+            "receipt.png",
+            "image/png");
+
+    protected async Task<Guid> UploadAsync(byte[] content, string fileName, string contentType)
     {
-        byte[] content = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, (byte)Interlocked.Increment(ref _uploads)];
         var response = await InScopeAsync(async sp => await sp.GetRequiredService<IMediator>().Send(
-            new UploadReceiptCommand("receipt.png", "image/png", content.Length, new MemoryStream(content)), Token));
+            new UploadReceiptCommand(fileName, contentType, content.Length, new MemoryStream(content)), Token));
         return Assert.IsType<UploadReceiptResponse.Created>(response).Id;
     }
+
+    /// <summary>Runs the worker's step once, as the background worker would.</summary>
+    protected Task<ProcessNextReceiptResult> ProcessOneAsync() =>
+        InScopeAsync(async sp => await sp.GetRequiredService<IMediator>().Send(new ProcessNextReceiptCommand(), Token));
 
     /// <summary>Adds a Queued receipt created <paramref name="minutesOld"/> minutes ago, with a checksum of its own.</summary>
     protected async Task<Receipt> AddQueuedAsync(int minutesOld = 0, string? checksum = null)
