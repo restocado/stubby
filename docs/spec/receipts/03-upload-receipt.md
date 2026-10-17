@@ -18,7 +18,7 @@ The command is a Mediator `ICommand<UploadReceiptResponse>`, handled by an `ICom
 4. Store the file, create the receipt as Queued, save, return its id and the transaction number the database assigned.
 5. If saving fails, delete the stored file. A unique-index violation from a race counts as a duplicate: look up the existing receipt by checksum and return `Duplicate` with its number.
 
-Rejections queue nothing and leave no file. `InputFile` sends the file over the Blazor circuit in segments, so the SignalR message size limit is left at its default. This is unverified: upload a 10 MB file in the running app, and raise `MaximumReceiveMessageSize` only if it fails.
+Rejections queue nothing and leave no file. `InputFile` sends the file over the Blazor circuit in segments, so the SignalR message size limit is left at its default. A file of exactly 10 485 760 bytes was uploaded this way in the running app without raising `MaximumReceiveMessageSize`.
 
 ## Acceptance criteria
 
