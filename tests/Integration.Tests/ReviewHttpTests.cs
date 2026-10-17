@@ -139,6 +139,28 @@ public class ReviewHttpTests(PostgresFixture fixture) : PostgresTest(fixture)
     }
 
     [Fact]
+    public async Task Every_receipt_that_can_be_opened_has_a_back_link_to_the_list_at_the_top()
+    {
+        var forReview = await ReadAsync();
+        var approved = await ReadAsync();
+        await InScopeAsync(async sp => await sp.GetRequiredService<IMediator>().Send(
+            new ApproveReceiptCommand(approved, "Final Cafe", new DateOnly(2026, 10, 3), 13.00m, ReceiptCategory.Dining), Token));
+        Fixture.Extractor.Failure = new ExtractionException("The provider returned HTTP 503.");
+        var failed = await UploadAsync();
+        Assert.IsType<ProcessNextReceiptResult.Failed>(await ProcessOneAsync());
+
+        foreach (var id in new[] { forReview, failed, approved })
+        {
+            var main = (await GetPageAsync($"/receipts/{id}")).Split("<main")[^1];
+
+            var backLink = main.IndexOf("Back to the receipts", StringComparison.Ordinal);
+            Assert.True(backLink >= 0, $"Receipt {id} has no back link.");
+            Assert.True(backLink < main.IndexOf("<h1", StringComparison.Ordinal), "The back link should come before the heading.");
+            Assert.Contains("href=\"receipts\"", main[..backLink], StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public async Task A_flagged_receipt_shows_a_banner_with_the_reasons()
     {
         Fixture.Extractor.Result = StubExtractor.Sample with { Total = 5000.00m, Date = null, Subtotal = null, Tax = null };

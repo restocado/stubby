@@ -37,6 +37,8 @@
         var isFailed = receipt.Status == ReceiptStatus.Failed;
         var imageUrl = $"api/receipts/{receipt.Id}/image";
 
+        <a class="btn btn-outline-secondary btn-sm mb-3" href="receipts">&larr; Back to the receipts</a>
+
         <h1>@TransactionNumber.Format(receipt.TransactionNo)</h1>
         <p class="text-muted text-break">@receipt.OriginalFileName</p>
 
