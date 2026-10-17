@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Stubby.Infrastructure.Tests" />
+    <InternalsVisibleTo Include="Stubby.Eval.Tests" />
   </ItemGroup>
 
 </Project>

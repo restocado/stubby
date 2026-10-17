@@ -5,8 +5,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Application\Stubby.Application.csproj" />
     <ProjectReference Include="..\Infrastructure\Stubby.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Stubby.Eval.Tests" />
   </ItemGroup>
 
 </Project>
