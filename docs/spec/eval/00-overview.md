@@ -4,7 +4,7 @@
 
 Console app that generates the 30 synthetic test receipts and scores the extractor against known answers.
 
-Separate console app. It references the Application abstractions and the Infrastructure extractor and runs receipts through `IReceiptExtractor` and the flag rules directly. No web app, database or queue. One folder per command (`Generate`, `Run`). `Generate` is built and its output is committed in `testset/`. `Run` is not built yet.
+Separate console app. It references the Application abstractions and the Infrastructure extractor and runs receipts through `IReceiptExtractor` and the flag rules directly. No web app, database or queue. One folder per command (`Generate`, `Run`). `Generate` is built and its output is committed in `testset/`. `Run` is built, and is tested against a fake extractor that knows the answer key. The first run against the real model has not been made.
 
 Usage, from the repository root: `dotnet run --project src/Eval -- generate [--out <folder>] [--seed <number>]`. The default folder is `testset` and the default seed is 20261017.
 

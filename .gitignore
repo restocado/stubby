@@ -429,3 +429,6 @@ FodyWeavers.xsd
 
 # Uploaded receipt images (local dev storage)
 /src/Web/data/
+
+# Report written by the eval tool's run command
+eval-report*.md
