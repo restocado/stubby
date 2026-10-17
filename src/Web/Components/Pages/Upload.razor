@@ -1,0 +1,100 @@
+@page "/upload"
+@rendermode InteractiveServer
+@using Mediator
+@using Stubby.Application.Features.Receipts.UploadReceipt
+@using Stubby.Domain.Receipts
+@inject IMediator Sender
+@inject ILogger<Upload> Logger
+
+<PageTitle>Upload receipts</PageTitle>
+
+<h1>Upload receipts</h1>
+
+<p>JPG, PNG or PDF, up to 10 MB each. You can choose several files at once.</p>
+
+<InputFile class="form-control mb-3"
+           OnChange="OnFilesChosen"
+           multiple
+           accept="image/jpeg,image/png,application/pdf"
+           disabled="@_busy" />
+
+@if (_results.Count > 0)
+{
+    <ul class="list-unstyled">
+        @foreach (var result in _results)
+        {
+            <li class="@result.CssClass">
+                <strong>@result.FileName</strong>: @result.Message
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private const int MaxFilesPerBatch = 100;
+
+    private readonly List<FileResult> _results = [];
+    private bool _busy;
+
+    private async Task OnFilesChosen(InputFileChangeEventArgs e)
+    {
+        _busy = true;
+        _results.Clear();
+
+        try
+        {
+            foreach (var file in e.GetMultipleFiles(MaxFilesPerBatch))
+            {
+                var result = new FileResult(file.Name, "Uploading...", "text-muted");
+                _results.Add(result);
+                StateHasChanged();
+
+                (result.Message, result.CssClass) = await UploadAsync(file);
+                StateHasChanged();
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task<(string Message, string CssClass)> UploadAsync(IBrowserFile file)
+    {
+        try
+        {
+            // One byte over the limit, so an oversized file comes back as TooLarge and does not throw.
+            await using var content = file.OpenReadStream(Receipt.MaxFileSizeBytes + 1);
+            var response = await Sender.Send(
+                new UploadReceiptCommand(file.Name, file.ContentType, file.Size, content),
+                CancellationToken.None);
+
+            return response switch
+            {
+                UploadReceiptResponse.Created c =>
+                    ($"Queued as {TransactionNumber.Format(c.TransactionNo)}.", "text-success"),
+                UploadReceiptResponse.Duplicate d =>
+                    ($"Already uploaded as {TransactionNumber.Format(d.ExistingTransactionNo)}.", "text-danger"),
+                UploadReceiptResponse.UnsupportedType =>
+                    ("Not supported. Use a JPG, PNG or PDF file.", "text-danger"),
+                UploadReceiptResponse.TooLarge =>
+                    ("Too large. The limit is 10 MB.", "text-danger"),
+                UploadReceiptResponse.Empty =>
+                    ("The file is empty.", "text-danger"),
+                _ => throw new InvalidOperationException($"Unhandled response {response.GetType().Name}."),
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Upload of {FileName} failed.", file.Name);
+            return ("Could not upload this file. Try again.", "text-danger");
+        }
+    }
+
+    private sealed class FileResult(string fileName, string message, string cssClass)
+    {
+        public string FileName { get; } = fileName;
+        public string Message { get; set; } = message;
+        public string CssClass { get; set; } = cssClass;
+    }
+}

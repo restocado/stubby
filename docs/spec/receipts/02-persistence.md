@@ -11,6 +11,7 @@ Map the domain to PostgreSQL as described in the database design, and create the
 ## Behavior
 
 - Npgsql provider. `DbSet<Receipt> Receipts`, `DbSet<FieldRecord> FieldRecords`.
+- The context is registered with `AddDbContextFactory`. Each repository method creates and disposes its own context (see `docs/architecture.md`).
 - Enums stored as text (`HasConversion<string>()`). Money `HasPrecision(15, 2)`.
 - `TransactionNo` is an identity column (`UseIdentityAlwaysColumn()`), so the database assigns it on insert.
 - Constraints, indexes and names exactly as in the database design. No foreign key between the tables.
