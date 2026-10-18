@@ -1,6 +1,6 @@
 # Test Set Generator
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Eval/Features/Generate/`: `GenerateTestSetCommand`, `GenerateTestSetCommandHandler`, `GenerateOptions` (output folder, seed), and under it `Content/` (the seeded plan of the 30 receipts), `Layouts/` (one class for each of the six layouts, and the `Sheet` they draw on), `PhotoEffect` and `PdfWriter`. The answer file types are in `Eval/Answers/AnswerFile.cs`, so the run command reads what the generator wrote. Output is committed to the repo, in `testset/` at the repository root.  
 **Depends on:** nothing.
 

@@ -1,6 +1,6 @@
 # Get Totals Trend
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Application/Features/Reports/GetTotalsTrend/`: `GetTotalsTrendQuery`, `GetTotalsTrendQueryHandler`, `GetTotalsTrendQueryValidator`, `GetTotalsTrendResponse`. A Mediator query. Uses `IReportReader.GetMonthlySumsAsync`.  
 **Depends on:** 01-get-monthly-totals.
 

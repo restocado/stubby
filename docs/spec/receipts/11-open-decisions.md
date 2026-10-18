@@ -1,6 +1,6 @@
 # Receipts Module : Open Decisions
 
-**Status:** Draft
+**Status:** Closed
 
 Nothing is open now. Each question was answered with its recommendation, built that way and merged, and is written into the spec it belongs to:
 

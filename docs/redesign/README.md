@@ -3,7 +3,7 @@
 Date: 2026-10-18  
 Author: restocado
 
-Screenshots of the app as it is, an audit of what they show, and low-fidelity wireframes and high-fidelity mockups for a redesign. Nothing here changes the app. It is the material to decide from.
+Screenshots of the app as it is, an audit of what they show, and low-fidelity wireframes and high-fidelity mockups for a redesign. It is the material the redesign was decided from. The redesign has since been built (see [`docs/spec/receipts/09-web-ui.md`](../spec/receipts/09-web-ui.md)), so the audit and the screenshots below show the app as it was before, not as it is now. The current UI is in the README.
 
 | File | What it is |
 |---|---|

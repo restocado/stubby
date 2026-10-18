@@ -1,6 +1,6 @@
 # Reports Module : Overview
 
-**Status:** Draft
+**Status:** Built
 
 Monthly totals by category and CSV export. Both read Approved receipts only.
 

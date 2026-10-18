@@ -1,6 +1,6 @@
 # Domain Model
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Domain/Receipts/`: `Receipt`, `FieldRecord`, `ReceiptStatus`, `ReceiptCategory`, `FieldName`.  
 **Depends on:** nothing.
 

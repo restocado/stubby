@@ -1,6 +1,6 @@
 # Eval Module : Test Plan
 
-**Status:** Draft
+**Status:** Built
 
 Checks on the eval tool itself. The real-model accuracy run is scenario 17 of the extraction test plan.
 

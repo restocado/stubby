@@ -1,6 +1,6 @@
 # Web UI
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Web/Components/`: `Pages/Home.razor` (the inbox), `Upload.razor`, `Receipts.razor`, `ReviewReceipt.razor`, `MonthlyTotals.razor`; `Layout/` (`MainLayout`, `NavMenu`, `FocusLayout`); `Shared/` (`Icon`, `StatusChip`, `Toast`, `ApprovedToast`, `ConfirmDialog`). Blazor Interactive Server, except the totals page, which needs no circuit. Pages call the slices and hold no business rules. The look is plain CSS: tokens and shared pieces in `wwwroot/app.css`, the rest beside each page. There is no CSS framework.  
 **Depends on:** 03 to 08, and 12 for the inbox and the review queue.
 

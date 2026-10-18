@@ -1,6 +1,6 @@
 # Delete Receipt
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Application/Features/Receipts/DeleteReceipt/`: `DeleteReceiptCommand`, `DeleteReceiptCommandHandler`, `DeleteReceiptResponse` (`Deleted`, `NotFound` or `Conflict`). A Mediator command. Uses `IReceiptRepository.DeleteAsync` and `IImageStore`.  
 **Depends on:** 01-domain-model, 02-persistence.
 
@@ -24,7 +24,7 @@ An Approved receipt leaves the totals and the CSV. The checksum is freed, so the
 - ForReview, Failed and Approved receipts are deleted with their file.
 - Queued and Processing return conflict and remove nothing.
 - Field records of a deleted Approved receipt remain unchanged, with nothing that identifies the receipt.
-- The deleted receipt's amount leaves its monthly total and the CSV. (The reports are not built yet: both read the Approved rows of `Receipts`, so a deleted row is gone from them by construction.)
+- The deleted receipt's amount leaves its monthly total and the CSV. (Both reports read the Approved rows of `Receipts`, so a deleted row is gone from them by construction.)
 - The same file can be uploaded again and gets a new `TransactionNo`. The deleted number is not reused.
 - A failed file delete still returns success. A failed database delete leaves the file.
 - The accuracy query returns the same counts before and after a delete.

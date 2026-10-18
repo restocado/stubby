@@ -1,6 +1,6 @@
 # Reprocess Receipts
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Application/Features/Receipts/ReprocessReceipt/`: `ReprocessReceiptCommand`, `ReprocessReceiptCommandHandler`. And `Application/Features/Receipts/ReprocessAllFailedReceipts/`: `ReprocessAllFailedReceiptsCommand`, `ReprocessAllFailedReceiptsCommandHandler`, `ReprocessAllFailedReceiptsResponse`. Both are Mediator commands that use `IReceiptRepository.ReprocessAsync` and `ReprocessAllFailedAsync`. The responses are result values: `ReprocessReceiptResponse` is `Requeued`, `NotFound` or `Conflict`, and the "all" response carries `RequeuedCount`.  
 **Depends on:** 01-domain-model, 02-persistence.
 

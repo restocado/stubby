@@ -1,6 +1,6 @@
 # Inbox and Review Queue
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Application/Features/Receipts/GetInbox/`, `GetReviewQueue/` and `CountReceiptsToReview/`: a Mediator query, handler and response each. Use `IReceiptRepository.GetInboxAsync`, `ListForReviewIdsAsync` and `CountForReviewAsync`.  
 **Depends on:** 01-domain-model, 02-persistence.
 

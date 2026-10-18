@@ -1,6 +1,6 @@
 # Persistence
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Infrastructure/Persistence/`: `StubbyDbContext`, `Configurations/ReceiptConfiguration.cs`, `Configurations/FieldRecordConfiguration.cs`, `Migrations/`. Application sees repository interfaces defined in Application.  
 **Depends on:** 01-domain-model.
 

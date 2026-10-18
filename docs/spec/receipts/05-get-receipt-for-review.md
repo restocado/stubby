@@ -1,6 +1,6 @@
 # Get Receipt For Review
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Application/Features/Receipts/GetReceiptForReview/`: `GetReceiptForReviewQuery`, `GetReceiptForReviewQueryHandler`, `GetReceiptForReviewResponse`. And `Application/Features/Receipts/GetReceiptImage/`: `GetReceiptImageQuery`, `GetReceiptImageQueryHandler`, `GetReceiptImageResponse`. Both are Mediator queries that use `IReceiptRepository.FindByIdAsync`, and the image one also `IImageStore.ReadAsync`. Image endpoint in Web (`Web/Endpoints/ReceiptEndpoints.cs`): `GET /api/receipts/{id:guid}/image`. The review page is `Web/Components/Pages/ReviewReceipt.razor` at `/receipts/{id}`.  
 **Depends on:** 01-domain-model, 02-persistence.
 

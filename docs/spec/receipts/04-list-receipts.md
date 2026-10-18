@@ -1,6 +1,6 @@
 # List Receipts
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Application/Features/Receipts/ListReceipts/`: `ListReceiptsQuery`, `ListReceiptsQueryHandler`, `ListReceiptsQueryValidator`, `ListReceiptsResponse`, `ReceiptListItem`. The query is a Mediator `IQuery<ListReceiptsResponse>`. Uses `IReceiptRepository.ListAsync`, which takes a `ReceiptFilter` and returns one page of the matching receipts with the number that match.  
 **Depends on:** 01-domain-model, 02-persistence.
 
