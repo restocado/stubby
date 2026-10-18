@@ -13,10 +13,21 @@ public interface IReceiptRepository
     Task<bool> TryAddAsync(Receipt receipt, CancellationToken cancellationToken);
 
     /// <summary>
-    /// One page of receipts, newest first (by <c>CreatedAt</c>, then <c>Id</c>), with the total number of
-    /// receipts. <paramref name="page"/> is 1-based. A page past the end has no items.
+    /// One page of the receipts that match <paramref name="filter"/>, newest first (by <c>CreatedAt</c>, then <c>Id</c>),
+    /// with the number of receipts that match. <paramref name="page"/> is 1-based. A page past the end has no items.
     /// </summary>
-    Task<ReceiptPage> ListAsync(int page, int pageSize, CancellationToken cancellationToken);
+    Task<ReceiptPage> ListAsync(ReceiptFilter filter, int page, int pageSize, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The receipts that need attention, at most <paramref name="limit"/> of each kind, with the counts of all of them.
+    /// </summary>
+    Task<InboxData> GetInboxAsync(int limit, CancellationToken cancellationToken);
+
+    /// <summary>The ids of the ForReview receipts, oldest first (by <c>CreatedAt</c>, then <c>Id</c>): the order they are reviewed in.</summary>
+    Task<IReadOnlyList<Guid>> ListForReviewIdsAsync(CancellationToken cancellationToken);
+
+    /// <summary>How many receipts are ForReview.</summary>
+    Task<int> CountForReviewAsync(CancellationToken cancellationToken);
 
     /// <summary>Reads one receipt, or null when there is none. The result is a snapshot: changes to it are not saved.</summary>
     Task<Receipt?> FindByIdAsync(Guid id, CancellationToken cancellationToken);

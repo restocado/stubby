@@ -16,4 +16,17 @@ internal static class FlagReasonText
         FlagReason.DateTooOld => "The date is more than a year old.",
         _ => reason.ToString(),
     };
+
+    /// <summary>A few words for a chip. <see cref="Describe"/> has the whole sentence.</summary>
+    public static string Short(FlagReason reason) => reason switch
+    {
+        FlagReason.TotalMissing => "Total missing",
+        FlagReason.TotalNotPositive => "Total not positive",
+        FlagReason.TotalAtOrAboveLimit => "Total looks large",
+        FlagReason.SubtotalTaxMismatch => "Totals don't add up",
+        FlagReason.DateMissing => "Date missing",
+        FlagReason.DateInFuture => "Date in the future",
+        FlagReason.DateTooOld => "Date is old",
+        _ => reason.ToString(),
+    };
 }

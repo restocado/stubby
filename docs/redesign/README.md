@@ -3,7 +3,7 @@
 Date: 2026-10-18  
 Author: restocado
 
-Screenshots of the app as it is, an audit of what they show, and low-fidelity wireframes and high-fidelity mockups for a redesign. Nothing here changes the app. It is the material to decide from.
+Screenshots of the app as it is, an audit of what they show, and low-fidelity wireframes and high-fidelity mockups for a redesign. It is the material the redesign was decided from. The redesign has since been built (see [`docs/spec/receipts/09-web-ui.md`](../spec/receipts/09-web-ui.md)), so the audit and the screenshots below show the app as it was before, not as it is now. The current UI is in the README.
 
 | File | What it is |
 |---|---|
@@ -86,15 +86,27 @@ Some of this is only a different layout of what exists. Some needs new work behi
 
 - **Desktop leads.** It is used mostly at a desk. Phones still have to work.
 - **The "Receipts" label stays.** The Inbox is a new page beside it, not a rename of it.
-- **"Approve & next" goes oldest first**, the order the receipts were added and read, with "1 of 3" showing the place. A receipt can be skipped to the end of the round.
+- **"Approve & next" goes oldest first**, the order the receipts were added and read, with "1 of 3" showing the place. A receipt can be skipped.
 - **No thumbnails.** A row is recognised by merchant, date and amount, and a PDF carries a small PDF tag. The wireframes still show thumbnail boxes because they were drawn first; the mockups follow this decision. Nothing needs to be generated or stored for it.
+- **The look** is the one in the mockups, drawn from scratch in plain CSS. Bootstrap is gone and no other framework was added.
+- **The name "Inbox"** for the home page.
+- **Totals extras** (the comparison with the month before, the 12-month strip and the average month) are in.
+
+## Built
+
+The redesign is built. See `docs/spec/receipts/09-web-ui.md` for how each page behaves, `12-inbox-and-review-queue.md` and `docs/spec/reports/05-get-totals-trend.md` for the new queries, and `04-list-receipts.md` for the filters. Where the build differs from the mockups:
+
+- **"1 of 3" is a place in what is waiting now.** After an approval the next receipt shows "1 of 2", not "2 of 3". Nothing is kept between receipts, so a receipt that arrives or is approved in another tab is taken into account.
+- **Skip opens the next receipt** in the same order, and after the newest it goes round to the oldest. It does not move the receipt to the end of a round, because there is no stored round.
+- **The end of a round is the Inbox.** After the last approval the page says what was approved and "You're all caught up". There is no "3 approved, none skipped" card, because nothing counts a round.
+- **The Inbox shows no "around two minutes"** and no Enter hint on "Start reviewing": the first was a guess and the second is only a shortcut on the review page.
+- **Category chips on Totals link to the list** (status Approved, that category and month). "Show them" on Totals adds the empty categories.
+- **Reprocess all failed** is "Try all again", on the list when it shows the Failed receipts.
+- **The phone tab bar has four tabs**, Inbox, Receipts, Add and Totals, so the raised Add button is third and not centred.
 
 ## Still open
 
-1. **How far from the template should it go?** Keep Bootstrap and restyle it (cheap), or a new look with its own brand and colours?
-2. **The name "Inbox" for the new home page.** "Receipts" stays for the full list. Is "Inbox" right for the page of what needs attention, or would "To review" or "Home" suit better?
-3. **Totals extras.** Is the last-month comparison and the 12-month strip wanted, or should Totals stay minimal for now?
-4. **Anything missing?** For example editing an approved receipt's category is impossible today. If you want that, it is a rule change, not a layout one.
+1. **Anything missing?** For example editing an approved receipt's category is impossible today. If you want that, it is a rule change, not a layout one.
 
 ## How these were made
 

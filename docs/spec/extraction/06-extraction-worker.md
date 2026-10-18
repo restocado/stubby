@@ -1,6 +1,6 @@
 # Extraction Worker
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Web/Workers/ExtractionWorker.cs` (`BackgroundService`) and `ExtractionWorkerOptions.cs` (`PollInterval`, from `Extraction:PollIntervalSeconds`, 2 to start with). `MaxAttempts` and `FlagTotalLimit` are the `Extraction` settings of slice 05, and the model and storage path are the gateway and image storage settings. Startup recovery in `Application/Features/Extraction/RecoverInterruptedReceipts/`: `RecoverInterruptedReceiptsCommand` and handler, using `IReceiptRepository.RequeueInterruptedAsync`.  
 **Depends on:** 05-process-next-receipt.
 

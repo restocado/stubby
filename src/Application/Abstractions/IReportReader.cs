@@ -16,9 +16,27 @@ public interface IReportReader
     /// both given, ordered by <c>ReceiptDate</c> and then <c>CreatedAt</c>.
     /// </summary>
     Task<IReadOnlyList<ApprovedReceiptRow>> ListApprovedAsync(int? year, int? month, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The sum of Approved receipts for each month from <paramref name="from"/> to <paramref name="to"/>, both included.
+    /// A month with no receipts is missing from the result.
+    /// </summary>
+    Task<IReadOnlyList<MonthSum>> GetMonthlySumsAsync(YearMonth from, YearMonth to, CancellationToken cancellationToken);
 }
 
-public readonly record struct YearMonth(int Year, int Month);
+public readonly record struct YearMonth(int Year, int Month)
+{
+    public YearMonth AddMonths(int months)
+    {
+        var index = (Year * 12) + (Month - 1) + months;
+        return new YearMonth(index / 12, (index % 12) + 1);
+    }
+
+    public int CompareTo(YearMonth other) => ((Year * 12) + Month).CompareTo((other.Year * 12) + other.Month);
+}
+
+/// <summary>The sum of the Approved receipts dated in one month.</summary>
+public sealed record MonthSum(YearMonth Month, decimal Total);
 
 public sealed record CategorySum(ReceiptCategory Category, decimal Total, int Count);
 

@@ -1,6 +1,6 @@
 # Receipts Module : Test Plan
 
-**Status:** Draft
+**Status:** Built
 
 Scenarios across several specs. Integration tests use a separate PostgreSQL test database and a fake extractor.
 

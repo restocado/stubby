@@ -1,6 +1,6 @@
 # Eval Module : Open Decisions
 
-**Status:** Draft
+**Status:** Closed
 
 Nothing is open now. Each question was answered with its recommendation, built, and written into the spec it belongs to.
 

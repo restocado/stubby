@@ -303,7 +303,7 @@ public class ReportsTests(PostgresFixture fixture) : PostgresTest(fixture)
     }
 
     [Fact]
-    public async Task The_totals_page_shows_all_eight_categories_with_their_sums_and_the_grand_total()
+    public async Task The_totals_page_shows_each_category_with_receipts_with_its_sum_and_the_grand_total()
     {
         await ApprovedAsync(new DateOnly(2026, 10, 2), 10.10m, ReceiptCategory.Groceries);
         await ApprovedAsync(new DateOnly(2026, 10, 9), 20.20m, ReceiptCategory.Groceries);
@@ -312,27 +312,63 @@ public class ReportsTests(PostgresFixture fixture) : PostgresTest(fixture)
         var html = await Client.GetStringAsync("/totals?year=2026&month=10", Token);
 
         Assert.Contains("October 2026", html, StringComparison.Ordinal);
-        foreach (var category in Enum.GetValues<ReceiptCategory>())
-        {
-            Assert.Contains($"<td>{category.ToString().ToLowerInvariant()}</td>", html, StringComparison.Ordinal);
-        }
-
+        Assert.Equal(2, Regex.Matches(html, "class=\"category-row").Count);
+        Assert.Matches("<strong[^>]*>groceries</strong>", html);
+        Assert.Matches("<strong[^>]*>dining</strong>", html);
+        Assert.DoesNotMatch("<strong[^>]*>transport</strong>", html);
         Assert.Contains("30.30", html, StringComparison.Ordinal);
         Assert.Contains("35.30", html, StringComparison.Ordinal);
-        Assert.Matches(@"Receipts</th>", html);
         Assert.DoesNotContain("$", html.Split("<main")[^1], StringComparison.Ordinal);
         Assert.Contains("api/reports/receipts.csv?year=2026&amp;month=10", html, StringComparison.Ordinal);
         Assert.Contains("href=\"api/reports/receipts.csv\"", html, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task An_empty_month_shows_eight_rows_at_zero_and_a_zero_grand_total()
+    public async Task Each_category_links_to_the_approved_receipts_behind_it_in_that_month()
+    {
+        await ApprovedAsync(new DateOnly(2026, 10, 2), 10.10m, ReceiptCategory.Groceries);
+
+        var html = await Client.GetStringAsync("/totals?year=2026&month=10", Token);
+
+        Assert.Contains("href=\"receipts?status=approved&amp;category=groceries&amp;month=2026-10\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_empty_categories_are_hidden_until_asked_for()
+    {
+        await ApprovedAsync(new DateOnly(2026, 10, 2), 10.10m, ReceiptCategory.Groceries);
+
+        var hidden = await Client.GetStringAsync("/totals?year=2026&month=10", Token);
+        var all = await Client.GetStringAsync("/totals?year=2026&month=10&empty=1", Token);
+
+        Assert.Single(Regex.Matches(hidden, "class=\"category-row"));
+        Assert.Contains("7 categories have nothing in October 2026 and are hidden.", hidden, StringComparison.Ordinal);
+        Assert.Equal(8, Regex.Matches(all, "class=\"category-row").Count);
+        Assert.Equal(7, Regex.Matches(all, "category-row none").Count);
+    }
+
+    [Fact]
+    public async Task An_empty_month_says_nothing_was_approved_and_has_a_zero_total()
     {
         var html = await Client.GetStringAsync("/totals?year=2026&month=10", Token);
 
-        // Eight categories and the grand total, each with a 0.00 amount and a count of 0.
-        Assert.Equal(9, Regex.Matches(html, @"0\.00").Count);
-        Assert.Equal(9, Regex.Matches(html, @"<td class=""text-end"">0</td>").Count);
+        Assert.Contains("Nothing approved in October 2026 yet.", html, StringComparison.Ordinal);
+        Assert.Contains(">0.00<", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"category-row", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_totals_page_shows_the_change_on_the_month_before_and_the_twelve_month_chart()
+    {
+        await ApprovedAsync(new DateOnly(2026, 9, 10), 200.00m, ReceiptCategory.Groceries);
+        await ApprovedAsync(new DateOnly(2026, 10, 10), 250.00m, ReceiptCategory.Groceries);
+
+        var html = await Client.GetStringAsync("/totals?year=2026&month=10", Token);
+
+        Assert.Contains("25% on September", html, StringComparison.Ordinal);
+        Assert.Equal(12, Regex.Matches(html, "class=\"column").Count);
+        Assert.Contains("Average a month", html, StringComparison.Ordinal);
+        Assert.Contains("225.00", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -372,13 +408,13 @@ public class ReportsTests(PostgresFixture fixture) : PostgresTest(fixture)
         var now = DateTime.Now;
         var current = await Client.GetStringAsync($"/totals?year={now.Year}&month={now.Month}", Token);
 
-        Assert.DoesNotContain("href=\"totals?year=2019&amp;month=12\"", first, StringComparison.Ordinal);
-        Assert.Contains("href=\"totals?year=2020&amp;month=2\"", first, StringComparison.Ordinal);
-        Assert.Contains("href=\"totals?year=2020&amp;month=1\"", middle, StringComparison.Ordinal);
-        Assert.Contains("href=\"totals?year=2020&amp;month=3\"", middle, StringComparison.Ordinal);
+        Assert.DoesNotContain("rel=\"prev\"", first, StringComparison.Ordinal);
+        Assert.Contains("rel=\"next\"", first, StringComparison.Ordinal);
+        Assert.Contains("rel=\"prev\"", middle, StringComparison.Ordinal);
+        Assert.Contains("rel=\"next\"", middle, StringComparison.Ordinal);
         Assert.Contains("rel=\"prev\"", current, StringComparison.Ordinal);
         Assert.DoesNotContain("rel=\"next\"", current, StringComparison.Ordinal);
-        Assert.Contains("disabled", first, StringComparison.Ordinal);
+        Assert.Contains("aria-disabled=\"true\"", first, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 # Extraction Module : Test Plan
 
-**Status:** Draft
+**Status:** Built
 
 Scenarios across several specs. Integration tests use a separate test database, a fake extractor and a fake provider.
 

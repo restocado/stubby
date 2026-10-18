@@ -2,7 +2,7 @@
 
 Date: 2026-10-17  
 Author: restocado  
-Status: Draft
+Status: Accepted
 
 Implements the data rules in [architecture.md](architecture.md), [business-requirements.md](business-requirements.md) and [non-functional-requirements.md](non-functional-requirements.md).
 

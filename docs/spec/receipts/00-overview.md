@@ -1,10 +1,10 @@
 # Receipts Module : Overview
 
-**Status:** Draft
+**Status:** Built
 
 User actions on a receipt: upload, list, open, approve, reprocess, delete. Also the domain model and tables behind them.
 
-Follows `docs/architecture.md`: one feature slice per command or query, in `Application/Features/Receipts/<Slice>/` (command or query, handler, validator, response). Dependencies point inward: Web and Infrastructure → Application → Domain. Not started.
+Follows `docs/architecture.md`: one feature slice per command or query, in `Application/Features/Receipts/<Slice>/` (command or query, handler, validator, response). Dependencies point inward: Web and Infrastructure → Application → Domain.
 
 | File | Contents |
 |---|---|
@@ -19,5 +19,6 @@ Follows `docs/architecture.md`: one feature slice per command or query, in `Appl
 | [09-web-ui.md](09-web-ui.md) | Blazor pages |
 | [10-test-plan.md](10-test-plan.md) | Cross-cutting tests |
 | [11-open-decisions.md](11-open-decisions.md) | Open items |
+| [12-inbox-and-review-queue.md](12-inbox-and-review-queue.md) | Inbox, review queue, menu count |
 
 **Build order:** 01 and 02 first; then 03 and 04; then 05 to 08 in any order; 09 alongside each slice.

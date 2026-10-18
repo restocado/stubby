@@ -1,6 +1,6 @@
 # Upload Receipt
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Application/Features/Receipts/UploadReceipt/`: `UploadReceiptCommand`, `UploadReceiptCommandHandler`, `UploadReceiptCommandValidator`, `UploadReceiptResponse`. Uses `IImageStore`. Called by `Upload.razor` through an `InputFile` component (see 09-web-ui). There is no HTTP endpoint for upload.  
 **Depends on:** 01-domain-model, 02-persistence.
 

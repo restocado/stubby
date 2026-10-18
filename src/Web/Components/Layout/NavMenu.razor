@@ -1,33 +1,122 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Stubby.Web</a>
-    </div>
-</div>
+﻿@rendermode InteractiveServer
+@implements IDisposable
+@using Mediator
+@using Stubby.Application.Features.Receipts.CountReceiptsToReview
+@inject IMediator Sender
+@inject NavigationManager Navigation
+@inject ILogger<NavMenu> Logger
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+@* The left rail on a desktop, and the bottom tab bar on a phone. CSS shows one of them. *@
+<aside class="rail">
+    <a class="logo" href="">
+        <span class="logo-mark"><Icon Name="stub" /></span>
+        Stubby
+    </a>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="receipts">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Receipts
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="totals">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Totals
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="upload">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Upload
-            </NavLink>
-        </div>
+    <nav aria-label="Main">
+        <NavLink class="rail-link" href="" Match="NavLinkMatch.All">
+            <Icon Name="inbox" /> Inbox
+            @if (_toReview > 0)
+            {
+                <span class="count" aria-label="@_toReview to review">@_toReview</span>
+            }
+        </NavLink>
+        <NavLink class="rail-link" href="receipts">
+            <Icon Name="receipt" /> Receipts
+        </NavLink>
+        <NavLink class="rail-link" href="totals">
+            <Icon Name="chart" /> Totals
+        </NavLink>
     </nav>
-</div>
 
+    <a class="button primary" href="upload"><Icon Name="plus" /> Add receipts</a>
+</aside>
+
+<nav class="tabbar" aria-label="Main">
+    <NavLink class="tab" href="" Match="NavLinkMatch.All">
+        <Icon Name="inbox" Class="large" /> Inbox
+        @if (_toReview > 0)
+        {
+            <span class="count">@_toReview</span>
+        }
+    </NavLink>
+    <NavLink class="tab" href="receipts">
+        <Icon Name="receipt" Class="large" /> Receipts
+    </NavLink>
+    <NavLink class="tab tab-add" href="upload">
+        <span class="tab-circle"><Icon Name="plus" Class="large" /></span> Add
+    </NavLink>
+    <NavLink class="tab" href="totals">
+        <Icon Name="chart" Class="large" /> Totals
+    </NavLink>
+</nav>
+
+@code {
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);
+
+    private readonly CancellationTokenSource _disposed = new();
+    private int _toReview;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RefreshPeriodicallyAsync();
+        }
+    }
+
+    // New receipts are read in the background, so the number is refreshed now and then.
+    private async Task RefreshPeriodicallyAsync()
+    {
+        using var timer = new PeriodicTimer(RefreshInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_disposed.Token))
+            {
+                await InvokeAsync(LoadAsync);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page was closed.
+        }
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) =>
+        _ = InvokeAsync(LoadAsync);
+
+    // The menu is never worth an error page: when the count cannot be read, the old number stays.
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var count = await Sender.Send(new CountReceiptsToReviewQuery(), _disposed.Token);
+            if (count != _toReview)
+            {
+                _toReview = count;
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page was closed.
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not count the receipts to review.");
+        }
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}

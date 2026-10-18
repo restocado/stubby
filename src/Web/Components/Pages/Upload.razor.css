@@ -1,0 +1,63 @@
+.intake { display: flex; flex-direction: column; gap: 12px; margin-bottom: 22px; }
+
+.dropzone {
+    position: relative;
+    padding: 36px 20px;
+    border: 2px dashed var(--line-strong);
+    background: #fbfaf7;
+    box-shadow: none;
+    text-align: center;
+}
+
+.dropzone:hover, .dropzone:focus-within { border-color: var(--brand); background: #f6fbf9; }
+.dropzone.busy { opacity: .6; }
+.dropzone h2 { margin: 12px 0 2px; font-size: 19px; font-weight: 700; }
+.dropzone p { margin: 0 0 16px; }
+
+.dropzone ::deep .dropzone-input, .dropzone ::deep input[type=file] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.drop-hint-phone { display: none; }
+.camera { display: none; position: relative; overflow: hidden; }
+.camera.disabled { opacity: .55; }
+.camera ::deep input[type=file] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+
+.files { padding: 4px 0; }
+.file { display: flex; align-items: center; gap: 14px; padding: 12px 18px; }
+.file + .file { border-top: 1px solid var(--line); }
+.file-main { flex: 1; min-width: 0; }
+.file-name { overflow: hidden; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+
+.file-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #f0eee8;
+    color: var(--muted);
+}
+
+.file-icon.warn { background: var(--warn-bg); color: var(--warn); }
+.file-icon.fail { background: var(--fail-bg); color: var(--fail); }
+
+.batch-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+
+/* A phone: the camera first, and the drop zone is only a button, because nothing is dragged there. */
+@media (max-width: 899.98px) {
+    .intake { flex-direction: column-reverse; }
+    .camera { display: inline-flex; height: 64px; font-size: 17px; }
+    .dropzone { padding: 14px; border: 1px solid var(--line-strong); background: #fff; }
+    .dropzone .empty-icon, .dropzone p, .dropzone .button, .drop-hint { display: none; }
+    .drop-hint-phone { display: inline; }
+    .dropzone h2 { margin: 0; font-size: 15px; font-weight: 600; }
+    .batch-footer { flex-direction: column-reverse; align-items: stretch; text-align: center; }
+    .batch-footer .button { width: 100%; }
+}

@@ -13,7 +13,13 @@ public sealed class ListReceiptsQueryHandler(
     {
         await validator.ValidateAndThrowAsync(query, cancellationToken);
 
-        var page = await receipts.ListAsync(query.Page, ListReceiptsQuery.PageSize, cancellationToken);
+        var filter = new ReceiptFilter(
+            string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim(),
+            query.Status,
+            query.Year,
+            query.Month,
+            query.Category);
+        var page = await receipts.ListAsync(filter, query.Page, ListReceiptsQuery.PageSize, cancellationToken);
         var pageCount = (page.TotalCount + ListReceiptsQuery.PageSize - 1) / ListReceiptsQuery.PageSize;
         return new ListReceiptsResponse(page.Items.Select(ToItem).ToList(), page.TotalCount, pageCount);
     }

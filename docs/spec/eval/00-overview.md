@@ -1,6 +1,6 @@
 # Eval Module : Overview
 
-**Status:** Draft
+**Status:** Built
 
 Console app that generates the 30 synthetic test receipts and scores the extractor against known answers.
 

@@ -30,7 +30,7 @@ public sealed class GetReceiptForReviewQueryHandler(IReceiptRepository receipts)
             receipt.OriginalFileName,
             receipt.ContentType,
             receipt.IsFlagged,
-            ParseFlagReasons(receipt.FlagReasons),
+            FlagReasonParser.Parse(receipt.FlagReasons),
             receipt.ExtractedMerchant,
             receipt.ExtractedDate,
             receipt.ExtractedTotal,
@@ -40,13 +40,4 @@ public sealed class GetReceiptForReviewQueryHandler(IReceiptRepository receipts)
             approved ? receipt.Category : null,
             receipt.Status == ReceiptStatus.Failed ? receipt.LastError : null));
     }
-
-    // FlagReasons is stored as comma-separated names. A name this version does not know is skipped.
-    private static List<FlagReason> ParseFlagReasons(string? stored) =>
-        string.IsNullOrWhiteSpace(stored)
-            ? []
-            : stored.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(name => Enum.TryParse<FlagReason>(name, out var reason) ? (FlagReason?)reason : null)
-                .OfType<FlagReason>()
-                .ToList();
 }
