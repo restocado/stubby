@@ -1,6 +1,6 @@
 # Approve Receipt
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Application/Features/Receipts/ApproveReceipt/`: `ApproveReceiptCommand`, `ApproveReceiptCommandHandler`, `ApproveReceiptCommandValidator`, `ApproveReceiptResponse`. A Mediator command. Uses `IReceiptRepository.FindByIdAsync` and `ApproveAsync`.  
 **Depends on:** 01-domain-model, 02-persistence.
 

@@ -1,14 +1,19 @@
 @page "/receipts/{Id:guid}"
+@layout FocusLayout
 @rendermode InteractiveServer
-@using System.Globalization
+@implements IAsyncDisposable
 @using Mediator
+@using Microsoft.JSInterop
 @using Stubby.Application.Features.Receipts.ApproveReceipt
 @using Stubby.Application.Features.Receipts.DeleteReceipt
 @using Stubby.Application.Features.Receipts.GetReceiptForReview
+@using Stubby.Application.Features.Receipts.GetReviewQueue
 @using Stubby.Application.Features.Receipts.ReprocessReceipt
 @using Stubby.Domain.Receipts
+@using Stubby.Domain.Receipts.Flagging
 @inject IMediator Sender
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 @inject ILogger<ReviewReceipt> Logger
 
 <PageTitle>Review receipt</PageTitle>
@@ -16,151 +21,275 @@
 @switch (_state)
 {
     case State.Loading:
-        <p>Loading...</p>
+        <p class="muted state">Loading...</p>
         break;
 
     case State.NotFound:
-        <h1>Receipt not found</h1>
-        <p>There is no such receipt. <a href="receipts">Back to the receipts</a>.</p>
+        <div class="state">
+            <h1>Receipt not found</h1>
+            <p class="muted">There is no such receipt. It may have been deleted.</p>
+            <a class="button primary" href="">Back to the inbox</a>
+        </div>
         break;
 
     case State.Locked:
-        <h1>Still being read</h1>
-        <p>This receipt is still being read. Try again in a moment. <a href="receipts">Back to the receipts</a>.</p>
+        <div class="state">
+            <h1>Still being read</h1>
+            <p class="muted">This receipt is still being read. Try again in a moment.</p>
+            <a class="button primary" href="">Back to the inbox</a>
+        </div>
         break;
 
-    case State.Failed:
-        <div class="alert alert-danger" role="alert">Could not load this receipt. <a href="receipts/@Id">Try again</a>.</div>
+    case State.LoadFailed:
+        <div class="state">
+            <div class="banner banner-fail" role="alert">Could not load this receipt. <a href="receipts/@Id">Try again</a>.</div>
+        </div>
         break;
 
     case State.Ready:
         var receipt = _receipt!;
+        var number = TransactionNumber.Format(receipt.TransactionNo);
         var isApproved = receipt.Status == ReceiptStatus.Approved;
         var isFailed = receipt.Status == ReceiptStatus.Failed;
+        var isPdf = receipt.ContentType == "application/pdf";
         var imageUrl = $"api/receipts/{receipt.Id}/image";
+        var hasNext = _queue?.NextId is not null;
+        var showForm = !isApproved && (!isFailed || _typing);
 
-        <a class="btn btn-outline-secondary btn-sm mb-3" href="receipts">&larr; Back to the receipts</a>
-
-        <h1>@TransactionNumber.Format(receipt.TransactionNo)</h1>
-        <p class="text-muted text-break">@receipt.OriginalFileName</p>
-
-        @if (isApproved)
-        {
-            <div class="alert alert-success" role="status">This receipt is approved and can no longer be changed.</div>
-        }
-        else if (isFailed)
-        {
-            <div class="alert alert-danger" role="alert">
-                Stubby could not read this receipt (@receipt.LastError). Enter the details yourself, or try reading it again.
-            </div>
-            <div class="mb-3 d-flex flex-wrap align-items-center gap-2">
-                @if (_confirmingDelete)
+        <div class="review">
+            <header class="topbar">
+                <a class="back" href="@(isApproved ? "receipts" : "")"><Icon Name="left" />Back to @(isApproved ? "receipts" : "inbox")</a>
+                <h1 class="sr-only">Receipt @number</h1>
+                @if (_queue is { Position: { } position, Count: > 0 } && receipt.Status == ReceiptStatus.ForReview)
                 {
-                    <span>Delete @TransactionNumber.Format(receipt.TransactionNo)?</span>
-                    <button type="button" class="btn btn-danger btn-sm" disabled="@_saving" @onclick="DeleteAsync">Yes, delete</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@_saving" @onclick="() => _confirmingDelete = false">Cancel</button>
+                    <div class="review-progress" aria-label="Receipt @position of @_queue.Count waiting for review">
+                        <strong>Reviewing @position of @_queue.Count</strong>
+                        <span class="segments" aria-hidden="true">
+                            @for (var i = 1; i <= Math.Min(_queue.Count, 12); i++)
+                            {
+                                <i class="@(i <= Math.Min(position, 12) ? "done" : "")"></i>
+                            }
+                        </span>
+                        <span class="muted">oldest first</span>
+                    </div>
                 }
-                else
-                {
-                    <button type="button" class="btn btn-outline-primary btn-sm" disabled="@_saving" @onclick="ReprocessAsync">Reprocess</button>
-                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@_saving" @onclick="() => _confirmingDelete = true">Delete</button>
-                }
-            </div>
-        }
-        else if (receipt.IsFlagged)
-        {
-            <div class="alert alert-warning" role="alert">
-                <strong>Please check this receipt.</strong>
-                <ul class="mb-0">
-                    @foreach (var reason in receipt.FlagReasons)
+                <span class="muted number">@number</span>
+            </header>
+
+            <div class="work">
+                <section class="viewer" @ref="_viewer" aria-label="Receipt @number">
+                    @if (isPdf)
                     {
-                        <li>@FlagReasonText.Describe(reason)</li>
+                        <iframe src="@imageUrl" title="Receipt @number"></iframe>
+                        <a class="open-full" href="@imageUrl" target="_blank" rel="noopener"><Icon Name="file" Class="small" />Open the PDF in a new tab</a>
                     }
-                </ul>
-            </div>
-        }
-
-        @if (_conflict)
-        {
-            <div class="alert alert-warning" role="alert">
-                This receipt can no longer be approved. It may have been approved in another tab. <a href="receipts">Back to the receipts</a>.
-            </div>
-        }
-
-        @if (_saveError is not null)
-        {
-            <div class="alert alert-danger" role="alert">@_saveError</div>
-        }
-
-        <div class="row g-4">
-            <div class="col-12 col-lg-6">
-                @if (receipt.ContentType == "application/pdf")
-                {
-                    <iframe src="@imageUrl" title="Receipt @TransactionNumber.Format(receipt.TransactionNo)" class="w-100 border" style="height: 70vh"></iframe>
-                    <p class="mt-2"><a href="@imageUrl" target="_blank" rel="noopener">Open the PDF in a new tab</a></p>
-                }
-                else
-                {
-                    <img src="@imageUrl" alt="Receipt @TransactionNumber.Format(receipt.TransactionNo)" class="img-fluid border" />
-                }
-            </div>
-
-            <div class="col-12 col-lg-6">
-                @if (isApproved)
-                {
-                    <dl class="row">
-                        <dt class="col-sm-4">Merchant</dt>
-                        <dd class="col-sm-8">@receipt.Merchant</dd>
-                        <dt class="col-sm-4">Date</dt>
-                        <dd class="col-sm-8">@receipt.ReceiptDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</dd>
-                        <dt class="col-sm-4">Total</dt>
-                        <dd class="col-sm-8">@receipt.Total?.ToString("F2", CultureInfo.InvariantCulture)</dd>
-                        <dt class="col-sm-4">Category</dt>
-                        <dd class="col-sm-8">@receipt.Category?.ToString().ToLowerInvariant()</dd>
-                    </dl>
-                    <a class="btn btn-secondary" href="receipts">Back to the receipts</a>
-                }
-                else
-                {
-                    <EditForm Model="_form" OnSubmit="ApproveAsync" FormName="review">
-                        <div class="mb-3">
-                            <label class="form-label" for="merchant">Merchant</label>
-                            <InputText id="merchant" class="form-control" @bind-Value="_form.Merchant" />
-                            <FieldMessage Errors="_errors" Field="Merchant" />
+                    else
+                    {
+                        <div class="viewer-stage">
+                            <div class="viewer-pan">
+                                <img class="viewer-image" src="@imageUrl" alt="Receipt @number" />
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="date">Date</label>
-                            <InputDate TValue="DateOnly?" id="date" class="form-control" @bind-Value="_form.Date" />
-                            <FieldMessage Errors="_errors" Field="Date" />
+                        <div class="viewer-tools" role="toolbar" aria-label="Receipt picture">
+                            <button type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (-)"><Icon Name="zoom-out" /></button>
+                            <span class="viewer-percent num">100%</span>
+                            <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)"><Icon Name="zoom-in" /></button>
+                            <span class="sep"></span>
+                            <button type="button" data-action="rotate" aria-label="Rotate" title="Rotate (R)"><Icon Name="rotate" /></button>
+                            <button type="button" data-action="fit" aria-label="Fit to the window" title="Fit (F)"><Icon Name="fit" /></button>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="total">Total</label>
-                            <InputNumber TValue="decimal?" id="total" class="form-control" @bind-Value="_form.Total" />
-                            <FieldMessage Errors="_errors" Field="Total" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="category">Category</label>
-                            <InputSelect TValue="ReceiptCategory?" id="category" class="form-select" @bind-Value="_form.Category">
-                                <option value="">Choose a category</option>
-                                @foreach (var category in Enum.GetValues<ReceiptCategory>())
+                        <a class="open-full" href="@imageUrl" target="_blank" rel="noopener"><Icon Name="zoom-in" Class="small" />Open full size</a>
+                    }
+                </section>
+
+                <div class="panel side">
+                    @if (isApproved)
+                    {
+                        <div class="banner banner-ok" role="status"><Icon Name="check" Class="large" /><div><strong>Approved</strong>This receipt can no longer be changed.</div></div>
+                        <dl class="values">
+                            <dt>Merchant</dt><dd>@receipt.Merchant</dd>
+                            <dt>Date</dt><dd class="num">@(receipt.ReceiptDate is { } approvedDate ? Format.Date(approvedDate) : "")</dd>
+                            <dt>Total</dt><dd class="num big-total">@(receipt.Total is { } approvedTotal ? Format.Money(approvedTotal) : "")</dd>
+                            <dt>Category</dt>
+                            <dd>
+                                @if (receipt.Category is { } approvedCategory)
                                 {
-                                    <option value="@category">@category.ToString().ToLowerInvariant()</option>
+                                    <span class="dot" style="--swatch: @Format.CategoryColor(approvedCategory)"></span> @Format.Category(approvedCategory)
                                 }
-                            </InputSelect>
-                            <FieldMessage Errors="_errors" Field="Category" />
+                            </dd>
+                        </dl>
+                        <div class="actions">
+                            <a class="button primary large block" href="receipts">Back to receipts</a>
+                            <button type="button" class="button block" disabled="@_saving" @onclick="() => _confirmingDelete = true"><Icon Name="trash" />Delete&hellip;</button>
                         </div>
-                        <p class="text-muted">Nothing is saved until you approve.</p>
-                        <button type="submit" class="btn btn-primary" disabled="@_saving">Approve</button>
-                        <a class="btn btn-link" href="receipts">Cancel</a>
-                    </EditForm>
-                }
+                    }
+                    else
+                    {
+                        @if (isFailed)
+                        {
+                            <div class="banner banner-fail" role="alert">
+                                <Icon Name="x" Class="large" />
+                                <div>
+                                    <strong>This receipt couldn't be read</strong>
+                                    @(receipt.LastError ?? "Stubby could not read it.") The receipt itself may be fine, so trying again may work.
+                                </div>
+                            </div>
+                        }
+                        else if (receipt.IsFlagged && receipt.FlagReasons.Count > 0)
+                        {
+                            <div class="banner banner-warn" role="alert">
+                                <Icon Name="alert" Class="large" />
+                                <div>
+                                    @if (receipt.FlagReasons.Count == 1)
+                                    {
+                                        <strong>@FlagReasonText.Short(receipt.FlagReasons[0])</strong>
+                                        @FlagReasonText.Describe(receipt.FlagReasons[0])
+                                    }
+                                    else
+                                    {
+                                        <strong>Please check this receipt</strong>
+                                        <ul>
+                                            @foreach (var reason in receipt.FlagReasons)
+                                            {
+                                                <li>@FlagReasonText.Describe(reason)</li>
+                                            }
+                                        </ul>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @if (_conflict)
+                        {
+                            <div class="banner banner-warn" role="alert">
+                                This receipt can no longer be approved. It may have been approved in another tab. <a href="">Back to the inbox</a>.
+                            </div>
+                        }
+
+                        @if (_saveError is not null)
+                        {
+                            <div class="banner banner-fail" role="alert">@_saveError</div>
+                        }
+
+                        @if (isFailed && !_typing)
+                        {
+                            <div class="choice panel padded chosen">
+                                <h2>Try reading it again</h2>
+                                <p class="muted">Uses the same picture. It takes a short while.</p>
+                                <button type="button" class="button primary large block" disabled="@_saving" @onclick="TryAgainAsync"><Icon Name="refresh" />Try again</button>
+                            </div>
+                            <div class="choice panel padded">
+                                <h2>Type it in myself</h2>
+                                <p class="muted">Opens a form for the merchant, date and total.</p>
+                                <button type="button" class="button large block" disabled="@_saving" @onclick="() => _typing = true"><Icon Name="edit" />Type it in</button>
+                            </div>
+                            <p class="muted delete-line">Not worth keeping? <button type="button" class="link-danger" @onclick="() => _confirmingDelete = true">Delete this receipt</button></p>
+                        }
+
+                        @if (showForm)
+                        {
+                            <EditForm Model="_form" OnSubmit="() => ApproveAsync(goNext: true)" FormName="review" class="form">
+                                <div class="field">
+                                    <label for="merchant">Merchant</label>
+                                    <InputText id="merchant" class="input" @bind-Value="_form.Merchant" />
+                                    <FieldMessage Errors="_errors" Field="Merchant" />
+                                </div>
+                                <div class="field">
+                                    <label for="date">Date</label>
+                                    <InputDate TValue="DateOnly?" id="date" class="@("input" + (DateNeedsCheck(receipt) ? " warn" : ""))" @bind-Value="_form.Date" />
+                                    <FieldMessage Errors="_errors" Field="Date" />
+                                </div>
+                                <div class="field">
+                                    <label for="total">Total</label>
+                                    <InputNumber TValue="decimal?" id="total" class="@("input big num" + (TotalNeedsCheck(receipt) ? " warn" : ""))" @bind-Value="_form.Total" />
+                                    <FieldMessage Errors="_errors" Field="Total" />
+                                </div>
+                                <div class="field">
+                                    <span class="field-label" id="category-label">Category</span>
+                                    <div class="category-chips" role="group" aria-labelledby="category-label">
+                                        @foreach (var category in Enum.GetValues<ReceiptCategory>())
+                                        {
+                                            <button type="button" class="category-chip @(_form.Category == category ? "on" : "")" aria-pressed="@(_form.Category == category)"
+                                                    style="--swatch: @Format.CategoryColor(category)" @onclick="() => _form.Category = category">
+                                                <span class="swatch"></span>@Format.Category(category)
+                                            </button>
+                                        }
+                                    </div>
+                                    <FieldMessage Errors="_errors" Field="Category" />
+                                </div>
+
+                                <div class="actions">
+                                    <button type="submit" class="button primary large block" disabled="@_saving">
+                                        @(hasNext ? "Approve & next" : "Approve") <span class="kbd">Enter</span>
+                                    </button>
+                                    <div class="secondary">
+                                        @if (hasNext)
+                                        {
+                                            <button type="button" class="button block" disabled="@_saving" @onclick="() => ApproveAsync(goNext: false)">Approve only</button>
+                                        }
+                                        @if (hasNext && receipt.Status == ReceiptStatus.ForReview)
+                                        {
+                                            <button type="button" class="button block" disabled="@_saving" @onclick="SkipAsync">Skip <span class="kbd light">S</span></button>
+                                        }
+                                    </div>
+                                    <div class="between hints">
+                                        @if (receipt.Status == ReceiptStatus.ForReview)
+                                        {
+                                            <button type="button" class="link" @onclick="() => _showRead = !_showRead">@(_showRead ? "Hide" : "Show") what was read</button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="link" @onclick="() => _typing = false">Back to the choices</button>
+                                        }
+                                        <span class="muted shortcuts-note">Shortcuts pause while you type</span>
+                                    </div>
+                                    @if (_showRead && receipt.Status == ReceiptStatus.ForReview)
+                                    {
+                                        <dl class="read-box">
+                                            <dt>Merchant</dt><dd>@(receipt.ExtractedMerchant ?? "not found")</dd>
+                                            <dt>Date</dt><dd class="num">@(receipt.ExtractedDate is { } readDate ? Format.Date(readDate) : "not found")</dd>
+                                            <dt>Total</dt><dd class="num">@(receipt.ExtractedTotal is { } readTotal ? Format.Money(readTotal) : "not found")</dd>
+                                        </dl>
+                                    }
+                                </div>
+                            </EditForm>
+                        }
+                    }
+                </div>
             </div>
+
+            <footer class="keys muted" aria-hidden="true">
+                @if (showForm)
+                {
+                    <span><span class="kbd light">Enter</span> approve &amp; next</span>
+                    <span><span class="kbd light">S</span> skip</span>
+                }
+                @if (!isPdf)
+                {
+                    <span><span class="kbd light">+</span> <span class="kbd light">&minus;</span> zoom</span>
+                    <span><span class="kbd light">R</span> rotate</span>
+                    <span><span class="kbd light">F</span> fit</span>
+                }
+                <span><span class="kbd light">Esc</span> back</span>
+            </footer>
         </div>
+
+        @if (_confirmingDelete)
+        {
+            <ConfirmDialog Title="Delete this receipt?" ConfirmText="Delete receipt" Busy="_saving" OnConfirm="DeleteAsync" OnCancel="() => _confirmingDelete = false">
+                <p>
+                    The receipt and its picture are removed for good@(isApproved ? ", and totals stop counting it" : "").
+                    The record of what was read stays, with nothing linking it back. This can't be undone.
+                </p>
+            </ConfirmDialog>
+        }
         break;
 }
 
+<ApprovedToast ReceiptId="_approvedId" />
+
 @code {
-    private enum State { Loading, NotFound, Locked, Failed, Ready }
+    private enum State { Loading, NotFound, Locked, LoadFailed, Ready }
 
     private sealed class EditModel
     {
@@ -172,25 +301,51 @@
 
     private State _state = State.Loading;
     private ReceiptForReview? _receipt;
+    private GetReviewQueueResponse? _queue;
     private EditModel _form = new();
     private Dictionary<string, string> _errors = [];
     private string? _saveError;
+    private Guid? _approvedId;
     private bool _conflict;
     private bool _saving;
     private bool _confirmingDelete;
+    private bool _typing;
+    private bool _showRead;
+    private bool _needsAttach;
+
+    private ElementReference _viewer;
+    private Task<IJSObjectReference>? _moduleTask;
+    private DotNetObjectReference<ReviewReceipt>? _self;
 
     [Parameter]
     public Guid Id { get; set; }
 
+    // "Type it in" from the inbox opens a Failed receipt straight at the form.
+    [SupplyParameterFromQuery(Name = "type")]
+    public string? TypeText { get; set; }
+
+    // The receipt that was approved just before this one, so the page can say so.
+    [SupplyParameterFromQuery(Name = "approved")]
+    public string? ApprovedText { get; set; }
+
     protected override async Task OnParametersSetAsync()
     {
         _state = State.Loading;
+        _approvedId = Guid.TryParse(ApprovedText, out var approved) ? approved : null;
+        _typing = TypeText == "1";
+        _confirmingDelete = false;
+        _showRead = false;
+        _saveError = null;
+        _conflict = false;
+        _errors = [];
+
         try
         {
             switch (await Sender.Send(new GetReceiptForReviewQuery(Id)))
             {
                 case GetReceiptForReviewResponse.Found found:
                     _receipt = found.Receipt;
+                    _queue = await Sender.Send(new GetReviewQueueQuery(Id));
 
                     // A ForReview receipt starts with what was read. A Failed one starts empty, as a manual entry.
                     _form = new EditModel
@@ -200,6 +355,7 @@
                         Total = found.Receipt.ExtractedTotal,
                     };
                     _state = State.Ready;
+                    _needsAttach = true;
                     break;
                 case GetReceiptForReviewResponse.Locked:
                     _state = State.Locked;
@@ -212,12 +368,92 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Could not load receipt {Id}.", Id);
-            _state = State.Failed;
+            _state = State.LoadFailed;
         }
     }
 
-    // A requeued receipt is Queued again, so it cannot be opened: go back to the list, where its progress shows.
-    private async Task ReprocessAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            if (firstRender)
+            {
+                _moduleTask = JS.InvokeAsync<IJSObjectReference>("import", "./Components/Pages/ReviewReceipt.razor.js").AsTask();
+                _self = DotNetObjectReference.Create(this);
+                await (await _moduleTask).InvokeVoidAsync("register", _self);
+            }
+
+            // The viewer is drawn again for each receipt, so it is hooked up again each time.
+            if (_needsAttach && _state == State.Ready && _receipt?.ContentType != "application/pdf" && _moduleTask is not null)
+            {
+                _needsAttach = false;
+                await (await _moduleTask).InvokeVoidAsync("attach", _viewer);
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // The browser went away.
+        }
+    }
+
+    private bool IsFormOpen => _state == State.Ready && _receipt is { } r && r.Status != ReceiptStatus.Approved && (r.Status != ReceiptStatus.Failed || _typing);
+
+    // Called by the keyboard shortcuts.
+    [JSInvokable]
+    public Task ApproveAndNext() => InvokeAsync(async () =>
+    {
+        if (IsFormOpen && !_saving && !_confirmingDelete)
+        {
+            await ApproveAsync(goNext: true);
+            StateHasChanged();
+        }
+    });
+
+    [JSInvokable]
+    public Task Skip() => InvokeAsync(async () =>
+    {
+        if (IsFormOpen && !_saving && !_confirmingDelete && _receipt?.Status == ReceiptStatus.ForReview)
+        {
+            await SkipAsync();
+            StateHasChanged();
+        }
+    });
+
+    [JSInvokable]
+    public Task Back() => InvokeAsync(() =>
+    {
+        if (!_saving && !_confirmingDelete)
+        {
+            Navigation.NavigateTo(_receipt?.Status == ReceiptStatus.Approved ? "receipts" : "/");
+        }
+    });
+
+    private static bool DateNeedsCheck(ReceiptForReview receipt) =>
+        receipt.IsFlagged && receipt.FlagReasons.Any(r => r is FlagReason.DateMissing or FlagReason.DateInFuture or FlagReason.DateTooOld);
+
+    private static bool TotalNeedsCheck(ReceiptForReview receipt) =>
+        receipt.IsFlagged && receipt.FlagReasons.Any(r =>
+            r is FlagReason.TotalMissing or FlagReason.TotalNotPositive or FlagReason.TotalAtOrAboveLimit or FlagReason.SubtotalTaxMismatch);
+
+    // The next receipt in the review. After the newest comes the oldest, so a skipped receipt comes round again.
+    private async Task SkipAsync()
+    {
+        try
+        {
+            if ((await Sender.Send(new GetReviewQueueQuery(Id))).NextId is { } next)
+            {
+                Navigation.NavigateTo($"receipts/{next}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not skip receipt {Id}.", Id);
+            _saveError = "That did not work. Try again.";
+        }
+    }
+
+    // A requeued receipt is Queued again, so it cannot be opened: go back to the inbox, where its progress shows.
+    private async Task TryAgainAsync()
     {
         await RunAsync(async () => await Sender.Send(new ReprocessReceiptCommand(Id)) switch
         {
@@ -229,17 +465,18 @@
 
     private async Task DeleteAsync()
     {
-        _confirmingDelete = false;
+        var wasApproved = _receipt?.Status == ReceiptStatus.Approved;
         await RunAsync(async () => await Sender.Send(new DeleteReceiptCommand(Id)) switch
         {
             DeleteReceiptResponse.Deleted => true,
             DeleteReceiptResponse.NotFound => FailWith(State.NotFound),
             _ => FailWith("This receipt is still being read, so it cannot be deleted."),
-        });
+        }, wasApproved ? "receipts" : "/");
+        _confirmingDelete = false;
     }
 
     // Runs an action that leaves this page when it works. A problem shows a short message and stays here.
-    private async Task RunAsync(Func<Task<bool>> action)
+    private async Task RunAsync(Func<Task<bool>> action, string leaveTo = "/")
     {
         _saving = true;
         _saveError = null;
@@ -248,7 +485,7 @@
         {
             if (await action())
             {
-                Navigation.NavigateTo("receipts");
+                Navigation.NavigateTo(leaveTo);
             }
         }
         catch (Exception ex)
@@ -265,28 +502,38 @@
     private bool FailWith(State state)
     {
         _state = state;
+        _confirmingDelete = false;
         return false;
     }
 
     private bool FailWith(string message)
     {
         _saveError = message;
+        _confirmingDelete = false;
         return false;
     }
 
-    private async Task ApproveAsync()
+    private async Task ApproveAsync(bool goNext)
     {
+        if (_saving)
+        {
+            return;
+        }
+
         _saving = true;
         _errors = [];
         _saveError = null;
         _conflict = false;
         try
         {
+            // Asked before approving, because after it this receipt is no longer in the queue.
+            var next = goNext ? (await Sender.Send(new GetReviewQueueQuery(Id))).NextId : null;
+
             var response = await Sender.Send(new ApproveReceiptCommand(Id, _form.Merchant, _form.Date, _form.Total, _form.Category));
             switch (response)
             {
                 case ApproveReceiptResponse.Approved:
-                    Navigation.NavigateTo("receipts");
+                    Navigation.NavigateTo(next is { } nextId ? $"receipts/{nextId}?approved={Id}" : $"/?approved={Id}");
                     return;
                 case ApproveReceiptResponse.Invalid invalid:
                     _errors = invalid.Errors.ToDictionary(e => e.Field, e => e.Message);
@@ -307,6 +554,24 @@
         finally
         {
             _saving = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _self?.Dispose();
+        if (_moduleTask is { IsCompletedSuccessfully: true } moduleTask)
+        {
+            try
+            {
+                var module = await moduleTask;
+                await module.InvokeVoidAsync("unregister");
+                await module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The browser went away, and took its listeners with it.
+            }
         }
     }
 }

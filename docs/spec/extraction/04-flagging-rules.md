@@ -1,6 +1,6 @@
 # Flagging Rules
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Domain/Receipts/Flagging/`: `ReceiptFlagEvaluator`, `FlagReason`, `FlagResult`. Inputs include `TotalLimit` and today's date, passed in.  
 **Depends on:** nothing.
 

@@ -21,10 +21,11 @@ internal sealed class ReceiptRepository(IDbContextFactory<StubbyDbContext> dbFac
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<ReceiptPage> ListAsync(int page, int pageSize, CancellationToken cancellationToken)
+    public async Task<ReceiptPage> ListAsync(ReceiptFilter filter, int page, int pageSize, CancellationToken cancellationToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var totalCount = await db.Receipts.CountAsync(cancellationToken);
+        var matching = Filter(db.Receipts.AsNoTracking(), filter);
+        var totalCount = await matching.CountAsync(cancellationToken);
 
         // Long math, so a huge page number cannot overflow.
         if ((page - 1L) * pageSize >= totalCount)
@@ -32,14 +33,98 @@ internal sealed class ReceiptRepository(IDbContextFactory<StubbyDbContext> dbFac
             return new ReceiptPage([], totalCount);
         }
 
-        var items = await db.Receipts
-            .AsNoTracking()
+        var items = await matching
             .OrderByDescending(r => r.CreatedAt)
             .ThenByDescending(r => r.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
         return new ReceiptPage(items, totalCount);
+    }
+
+    private static IQueryable<Receipt> Filter(IQueryable<Receipt> receipts, ReceiptFilter filter)
+    {
+        receipts = filter.Status switch
+        {
+            ReceiptStatusFilter.ToReview => receipts.Where(r => r.Status == ReceiptStatus.ForReview),
+            ReceiptStatusFilter.Approved => receipts.Where(r => r.Status == ReceiptStatus.Approved),
+            ReceiptStatusFilter.Failed => receipts.Where(r => r.Status == ReceiptStatus.Failed),
+            _ => receipts,
+        };
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            // The final merchant when there is one (Approved), otherwise what was read. A file name matches too, because a
+            // receipt that could not be read has no merchant. The pattern's own wildcards are escaped.
+            var pattern = "%" + EscapeLike(filter.Search.Trim()) + "%";
+            receipts = receipts.Where(r =>
+                EF.Functions.ILike(r.Merchant ?? r.ExtractedMerchant ?? string.Empty, pattern, @"\")
+                || EF.Functions.ILike(r.OriginalFileName, pattern, @"\"));
+        }
+
+        if (filter.Year is { } year && filter.Month is { } month)
+        {
+            var first = new DateOnly(year, month, 1);
+            var next = first.AddMonths(1);
+            receipts = receipts.Where(r => (r.ReceiptDate ?? r.ExtractedDate) >= first && (r.ReceiptDate ?? r.ExtractedDate) < next);
+        }
+
+        if (filter.Category is { } category)
+        {
+            receipts = receipts.Where(r => r.Category == category);
+        }
+
+        return receipts;
+    }
+
+    private static string EscapeLike(string text) =>
+        text.Replace(@"\", @"\\", StringComparison.Ordinal)
+            .Replace("%", @"\%", StringComparison.Ordinal)
+            .Replace("_", @"\_", StringComparison.Ordinal);
+
+    public async Task<InboxData> GetInboxAsync(int limit, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var receipts = db.Receipts.AsNoTracking();
+
+        var forReviewCount = await receipts.CountAsync(r => r.Status == ReceiptStatus.ForReview, cancellationToken);
+        var forReview = await receipts
+            .Where(r => r.Status == ReceiptStatus.ForReview)
+            .OrderBy(r => r.CreatedAt)
+            .ThenBy(r => r.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        var failedCount = await receipts.CountAsync(r => r.Status == ReceiptStatus.Failed, cancellationToken);
+        var failed = await receipts
+            .Where(r => r.Status == ReceiptStatus.Failed)
+            .OrderByDescending(r => r.CreatedAt)
+            .ThenByDescending(r => r.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        var reading = await receipts.CountAsync(
+            r => r.Status == ReceiptStatus.Queued || r.Status == ReceiptStatus.Processing, cancellationToken);
+
+        return new InboxData(forReview, forReviewCount, failed, failedCount, reading);
+    }
+
+    public async Task<IReadOnlyList<Guid>> ListForReviewIdsAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Receipts
+            .AsNoTracking()
+            .Where(r => r.Status == ReceiptStatus.ForReview)
+            .OrderBy(r => r.CreatedAt)
+            .ThenBy(r => r.Id)
+            .Select(r => r.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> CountForReviewAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Receipts.CountAsync(r => r.Status == ReceiptStatus.ForReview, cancellationToken);
     }
 
     public async Task<Receipt?> FindByIdAsync(Guid id, CancellationToken cancellationToken)

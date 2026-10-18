@@ -6,28 +6,82 @@
 @inject IMediator Sender
 @inject ILogger<Upload> Logger
 
-<PageTitle>Upload receipts</PageTitle>
+<PageTitle>Add receipts</PageTitle>
 
-<h1>Upload receipts</h1>
+<header class="page-head">
+    <div>
+        <h1>Add receipts</h1>
+        <p>They are read in the background, so you can keep adding.</p>
+    </div>
+</header>
 
-<p>JPG, PNG or PDF, up to 10 MB each. You can choose several files at once.</p>
+<div class="intake">
+    @* The file input covers the whole zone, so a click anywhere opens the chooser and a drop anywhere lands on it. *@
+    <div class="panel dropzone @(_busy ? "busy" : "")">
+        <InputFile class="dropzone-input"
+                   OnChange="OnFilesChosen"
+                   multiple
+                   accept="image/jpeg,image/png,application/pdf"
+                   disabled="@_busy"
+                   aria-label="Choose receipts to add" />
+        <div class="empty-icon"><Icon Name="upload" Class="large" /></div>
+        <h2><span class="drop-hint">Drop receipts here</span><span class="drop-hint-phone">Choose photos or files</span></h2>
+        <p class="muted">JPG, PNG or PDF, up to 10 MB each. Several at once is fine.</p>
+        <span class="button primary large">Choose files</span>
+    </div>
 
-<InputFile class="form-control mb-3"
-           OnChange="OnFilesChosen"
-           multiple
-           accept="image/jpeg,image/png,application/pdf"
-           disabled="@_busy" />
+    @* A phone opens its camera for this one. *@
+    <label class="button primary large camera @(_busy ? "disabled" : "")">
+        <Icon Name="camera" Class="large" /> Take a photo
+        <InputFile class="camera-input"
+                   OnChange="OnFilesChosen"
+                   accept="image/*"
+                   capture="environment"
+                   disabled="@_busy"
+                   aria-label="Take a photo of a receipt" />
+    </label>
+</div>
 
 @if (_results.Count > 0)
 {
-    <ul class="list-unstyled">
-        @foreach (var result in _results)
+    <section class="batch">
+        <h2 class="section-title">This batch <span>@(_results.Count == 1 ? "1 file" : $"{_results.Count} files")</span></h2>
+        <div class="panel files">
+            @foreach (var result in _results)
+            {
+                <div class="file" @key="result">
+                    <div class="file-icon @result.IconClass"><Icon Name="file" /></div>
+                    <div class="file-main">
+                        <div class="file-name">@result.FileName</div>
+                        <div class="muted">@result.Message</div>
+                    </div>
+                    @switch (result.Outcome)
+                    {
+                        case Outcome.Sending:
+                            <span class="chip chip-read"><span class="spinner"></span>Sending</span>
+                            break;
+                        case Outcome.Added:
+                            <span class="chip chip-ok"><Icon Name="check" Class="small" />Added</span>
+                            break;
+                        case Outcome.Duplicate:
+                            <span class="chip chip-warn">Already there</span>
+                            break;
+                        default:
+                            <span class="chip chip-fail">Skipped</span>
+                            break;
+                    }
+                </div>
+            }
+        </div>
+
+        @if (!_busy)
         {
-            <li class="@result.CssClass">
-                <strong>@result.FileName</strong>: @result.Message
-            </li>
+            <div class="batch-footer">
+                <span class="muted">@Summary()</span>
+                <a class="button primary large" href="">Go to inbox <Icon Name="arrow" /></a>
+            </div>
         }
-    </ul>
+    </section>
 }
 
 @code {
@@ -45,11 +99,11 @@
         {
             foreach (var file in e.GetMultipleFiles(MaxFilesPerBatch))
             {
-                var result = new FileResult(file.Name, "Uploading...", "text-muted");
+                var result = new FileResult(file.Name);
                 _results.Add(result);
                 StateHasChanged();
 
-                (result.Message, result.CssClass) = await UploadAsync(file);
+                await UploadAsync(file, result);
                 StateHasChanged();
             }
         }
@@ -59,7 +113,7 @@
         }
     }
 
-    private async Task<(string Message, string CssClass)> UploadAsync(IBrowserFile file)
+    private async Task UploadAsync(IBrowserFile file, FileResult result)
     {
         try
         {
@@ -69,32 +123,67 @@
                 new UploadReceiptCommand(file.Name, file.ContentType, file.Size, content),
                 CancellationToken.None);
 
-            return response switch
+            switch (response)
             {
-                UploadReceiptResponse.Created c =>
-                    ($"Queued as {TransactionNumber.Format(c.TransactionNo)}.", "text-success"),
-                UploadReceiptResponse.Duplicate d =>
-                    ($"Already uploaded as {TransactionNumber.Format(d.ExistingTransactionNo)}.", "text-danger"),
-                UploadReceiptResponse.UnsupportedType =>
-                    ("Not supported. Use a JPG, PNG or PDF file.", "text-danger"),
-                UploadReceiptResponse.TooLarge =>
-                    ("Too large. The limit is 10 MB.", "text-danger"),
-                UploadReceiptResponse.Empty =>
-                    ("The file is empty.", "text-danger"),
-                _ => throw new InvalidOperationException($"Unhandled response {response.GetType().Name}."),
-            };
+                case UploadReceiptResponse.Created:
+                    result.Set(Outcome.Added, "Added. Being read now.");
+                    break;
+                case UploadReceiptResponse.Duplicate d:
+                    result.Set(Outcome.Duplicate, $"Already added as {TransactionNumber.Format(d.ExistingTransactionNo)}.");
+                    break;
+                case UploadReceiptResponse.UnsupportedType:
+                    result.Set(Outcome.Skipped, "Not supported. Use a JPG, PNG or PDF file.");
+                    break;
+                case UploadReceiptResponse.TooLarge:
+                    result.Set(Outcome.Skipped, "Too large. The limit is 10 MB.");
+                    break;
+                case UploadReceiptResponse.Empty:
+                    result.Set(Outcome.Skipped, "The file is empty.");
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unhandled response {response.GetType().Name}.");
+            }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Upload of {FileName} failed.", file.Name);
-            return ("Could not upload this file. Try again.", "text-danger");
+            result.Set(Outcome.Skipped, "Could not upload this file. Try again.");
         }
     }
 
-    private sealed class FileResult(string fileName, string message, string cssClass)
+    private string Summary()
+    {
+        var parts = new List<string>();
+        AddPart(parts, Outcome.Added, "added");
+        AddPart(parts, Outcome.Duplicate, "already there");
+        AddPart(parts, Outcome.Skipped, "skipped");
+        return string.Join(" · ", parts);
+    }
+
+    private void AddPart(List<string> parts, Outcome outcome, string text)
+    {
+        var count = _results.Count(r => r.Outcome == outcome);
+        if (count > 0)
+        {
+            parts.Add($"{count} {text}");
+        }
+    }
+
+    private enum Outcome { Sending, Added, Duplicate, Skipped }
+
+    private sealed class FileResult(string fileName)
     {
         public string FileName { get; } = fileName;
-        public string Message { get; set; } = message;
-        public string CssClass { get; set; } = cssClass;
+        public Outcome Outcome { get; private set; } = Outcome.Sending;
+        public string Message { get; private set; } = "Sending...";
+
+        public string IconClass => Outcome switch
+        {
+            Outcome.Duplicate => "warn",
+            Outcome.Skipped => "fail",
+            _ => "",
+        };
+
+        public void Set(Outcome outcome, string message) => (Outcome, Message) = (outcome, message);
     }
 }

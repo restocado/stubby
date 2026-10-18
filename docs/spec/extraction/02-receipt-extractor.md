@@ -1,6 +1,6 @@
 # Receipt Extractor
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `IReceiptExtractor`, `ReceiptFile`, `ExtractionResult` and `ExtractionException` in `Application/Abstractions/`. `VisionReceiptExtractor`, `ExtractionPrompt`, `ExtractionResponseParser` in `Infrastructure/Extraction/`. The prompt and reply format are explained in [docs/extraction-prompt.md](../../extraction-prompt.md).  
 **Depends on:** 01-ai-gateway, 03-pdf-rendering.
 

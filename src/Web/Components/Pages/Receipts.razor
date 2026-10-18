@@ -3,153 +3,363 @@
 @implements IDisposable
 @using System.Globalization
 @using Mediator
+@using Stubby.Application.Abstractions
 @using Stubby.Application.Features.Receipts.DeleteReceipt
 @using Stubby.Application.Features.Receipts.ListReceipts
 @using Stubby.Application.Features.Receipts.ReprocessAllFailedReceipts
 @using Stubby.Application.Features.Receipts.ReprocessReceipt
+@using Stubby.Application.Features.Reports.GetMonthlyTotals
 @using Stubby.Domain.Receipts
 @inject IMediator Sender
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
 @inject ILogger<Receipts> Logger
 
 <PageTitle>Receipts</PageTitle>
 
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-    <h1 class="mb-0">Receipts</h1>
-    <button type="button" class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="ReprocessAllAsync">
-        Reprocess all failed
-    </button>
+<header class="page-head">
+    <div>
+        <h1>Receipts</h1>
+        @if (_response is not null)
+        {
+            <p class="num">@(IsFiltered ? $"{Format.Receipts(_response.TotalCount)} match" : Format.Receipts(_response.TotalCount))</p>
+        }
+    </div>
+    <div class="head-actions">
+        @if (_filter.Status == ReceiptStatusFilter.Failed && _response is { TotalCount: > 0 })
+        {
+            <button type="button" class="button" disabled="@_busy" @onclick="ReprocessAllAsync"><Icon Name="refresh" /> Try all again</button>
+        }
+        <a class="button primary" href="upload"><Icon Name="plus" /> Add receipts</a>
+    </div>
+</header>
+
+<div class="filters">
+    <label class="search">
+        <Icon Name="search" />
+        <input type="search" placeholder="Search merchants" aria-label="Search merchants" maxlength="@ListReceiptsQuery.MaxSearchLength"
+               value="@_searchShown" @oninput="OnSearchInput" />
+    </label>
+    <nav class="segmented" aria-label="Show">
+        <a href="@Url(status: ReceiptStatusFilter.All)" class="@(_filter.Status == ReceiptStatusFilter.All ? "on" : "")">All</a>
+        <a href="@Url(status: ReceiptStatusFilter.ToReview)" class="@(_filter.Status == ReceiptStatusFilter.ToReview ? "on" : "")">To review</a>
+        <a href="@Url(status: ReceiptStatusFilter.Approved)" class="@(_filter.Status == ReceiptStatusFilter.Approved ? "on" : "")">Approved</a>
+        <a href="@Url(status: ReceiptStatusFilter.Failed)" class="@(_filter.Status == ReceiptStatusFilter.Failed ? "on" : "")">Couldn't be read</a>
+    </nav>
+    <select class="select" aria-label="Month" @onchange="OnMonthChanged">
+        <option value="">All months</option>
+        @foreach (var (value, label) in _months)
+        {
+            <option value="@value" selected="@(value == MonthValue)">@label</option>
+        }
+    </select>
+    @if (_filter.Category is { } category)
+    {
+        <a class="chip chip-review active-filter" href="@Url(clearCategory: true)" title="Show every category">
+            <span class="dot" style="--swatch: @Format.CategoryColor(category)"></span>@Format.Category(category)<Icon Name="x" Class="small" />
+        </a>
+    }
 </div>
 
 @if (_notice is not null)
 {
-    <div class="alert @(_noticeIsError ? "alert-danger" : "alert-success")" role="status">@_notice</div>
+    <div class="banner @(_noticeIsError ? "banner-fail" : "banner-ok")" role="status">@_notice</div>
 }
 
 @if (_error is not null)
 {
-    <div class="alert alert-danger" role="alert">@_error</div>
+    <div class="banner banner-fail" role="alert">@_error</div>
 }
-
-@if (_response is null)
+else if (_response is null)
 {
-    @if (_error is null)
-    {
-        <p>Loading...</p>
-    }
+    <p class="muted">Loading...</p>
+}
+else if (_response.TotalCount == 0 && !IsFiltered)
+{
+    <div class="panel empty">
+        <div class="empty-icon"><Icon Name="receipt" Class="large" /></div>
+        <h2>No receipts yet</h2>
+        <p>Add a photo or a PDF of a receipt and it shows up here.</p>
+        <a class="button primary large" href="upload">Add receipts</a>
+    </div>
 }
 else if (_response.TotalCount == 0)
 {
-    <p>No receipts yet. <a href="upload">Upload one</a>.</p>
+    <div class="panel empty">
+        <div class="empty-icon"><Icon Name="search" Class="large" /></div>
+        <h2>No receipts match</h2>
+        <p>Nothing fits those filters.</p>
+        <a class="button large" href="receipts">Clear filters</a>
+    </div>
 }
 else if (_response.Items.Count == 0)
 {
-    <p>There is no page @_page. <a href="receipts?page=@_response.PageCount">Go to the last page</a>.</p>
+    <div class="panel empty">
+        <h2>There is no page @_page</h2>
+        <p>The list has @_response.PageCount @(_response.PageCount == 1 ? "page" : "pages").</p>
+        <a class="button large" href="@Url(page: _response.PageCount)">Go to the last page</a>
+    </div>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th>Number</th>
-                    <th>File</th>
-                    <th>Status</th>
-                    <th>Merchant</th>
-                    <th>Date</th>
-                    <th class="text-end">Total</th>
-                    <th>Category</th>
-                    <th><span class="visually-hidden">Actions</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var item in _response.Items)
-                {
-                    <tr @key="item.Id">
-                        <td class="text-nowrap">
-                            @* Queued and Processing receipts are still being read, so they cannot be opened. *@
-                            @if (item.CanOpen || item.Status == ReceiptStatus.Approved)
-                            {
-                                <a href="receipts/@item.Id">@TransactionNumber.Format(item.TransactionNo)</a>
-                            }
-                            else
-                            {
-                                @TransactionNumber.Format(item.TransactionNo)
-                            }
-                        </td>
-                        <td class="text-break">@item.OriginalFileName</td>
-                        <td class="text-nowrap">
-                            <span class="badge @StatusClass(item.Status)">@StatusText(item.Status)</span>
-                            @if (item.IsFlagged)
-                            {
-                                <span class="badge text-bg-warning" title="This receipt needs a closer look">Flagged</span>
-                            }
-                        </td>
-                        <td>@item.Merchant</td>
-                        <td class="text-nowrap">@item.ReceiptDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</td>
-                        <td class="text-end text-nowrap">@item.Total?.ToString("F2", CultureInfo.InvariantCulture)</td>
-                        <td>@item.Category?.ToString().ToLowerInvariant()</td>
-                        <td class="text-nowrap text-end">
-                            @if (_confirmingDelete == item.Id)
-                            {
-                                <span class="me-1">Delete @TransactionNumber.Format(item.TransactionNo)?</span>
-                                <button type="button" class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => DeleteAsync(item)">Yes, delete</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="CancelDelete">Cancel</button>
-                            }
-                            else
-                            {
+    <div class="panel list">
+        <div class="line head" aria-hidden="true">
+            <span>Merchant</span><span>Date</span><span>Category</span><span>Status</span><span class="right">Total</span><span></span>
+        </div>
+        @foreach (var item in _response.Items)
+        {
+            var number = TransactionNumber.Format(item.TransactionNo);
+            var hasValues = item.Status is ReceiptStatus.Approved or ReceiptStatus.ForReview;
+            var openable = item.CanOpen || item.Status == ReceiptStatus.Approved;
+            <div class="line @(_menuFor == item.Id ? "menu-open" : "")" @key="item.Id">
+                <div class="merchant">
+                    @if (openable)
+                    {
+                        <a class="name" href="receipts/@item.Id">@(item.Merchant ?? item.OriginalFileName)</a>
+                    }
+                    else
+                    {
+                        <span class="name muted">@(item.Merchant ?? item.OriginalFileName)</span>
+                    }
+                    <div class="sub muted">@number</div>
+                </div>
+                <span class="date num">@(item.ReceiptDate is { } date ? Format.Date(date) : "")</span>
+                <span class="category">
+                    @if (item.Category is { } itemCategory)
+                    {
+                        <a class="category-link" href="@Url(categoryFilter: itemCategory, status: ReceiptStatusFilter.Approved)" title="Show only @Format.Category(itemCategory)">
+                            <span class="dot" style="--swatch: @Format.CategoryColor(itemCategory)"></span>@Format.Category(itemCategory)
+                        </a>
+                    }
+                </span>
+                <span class="status"><StatusChip Status="item.Status" IsFlagged="item.IsFlagged" /></span>
+                <span class="total num">@(item.Total is { } total && hasValues ? Format.Money(total) : "")</span>
+                <span class="actions">
+                    @* Queued and Processing receipts are still being read: no menu. *@
+                    @if (openable || item.CanDelete)
+                    {
+                        <button type="button" class="more" aria-label="Actions for @number" aria-haspopup="menu" aria-expanded="@(_menuFor == item.Id)"
+                                @onclick="() => ToggleMenu(item.Id)">
+                            <Icon Name="more" />
+                        </button>
+                        @if (_menuFor == item.Id)
+                        {
+                            <button type="button" class="menu-backdrop" tabindex="-1" aria-label="Close the menu" @onclick="CloseMenu"></button>
+                            <div class="menu" role="menu">
+                                @if (openable)
+                                {
+                                    <a role="menuitem" href="receipts/@item.Id"><Icon Name="file" />Open</a>
+                                }
                                 @if (item.Status == ReceiptStatus.Failed)
                                 {
-                                    <button type="button" class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="() => ReprocessAsync(item)">Reprocess</button>
+                                    <button type="button" role="menuitem" disabled="@_busy" @onclick="() => ReprocessAsync(item)"><Icon Name="refresh" />Try reading again</button>
                                 }
-
-                                @* Queued and Processing receipts have no delete action. *@
                                 @if (item.CanDelete)
                                 {
-                                    <button type="button" class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick="() => AskDelete(item.Id)">Delete</button>
+                                    <hr />
+                                    <button type="button" role="menuitem" class="danger-item" @onclick="() => AskDelete(item)"><Icon Name="trash" />Delete&hellip;</button>
                                 }
-                            }
-                        </td>
-                    </tr>
+                            </div>
+                        }
+                    }
+                </span>
+            </div>
+        }
+        <div class="pager">
+            <span class="muted num">@RangeText()</span>
+            <span class="pager-links">
+                @if (_page > 1)
+                {
+                    <a class="button small" href="@Url(page: _page - 1)"><Icon Name="left" Class="small" />Previous</a>
                 }
-            </tbody>
-        </table>
+                @if (_page < _response.PageCount)
+                {
+                    <a class="button small" href="@Url(page: _page + 1)">Next<Icon Name="right" Class="small" /></a>
+                }
+            </span>
+        </div>
     </div>
+}
 
-    <nav class="d-flex align-items-center gap-3" aria-label="Receipt pages">
-        @if (_page > 1)
-        {
-            <a href="receipts?page=@(_page - 1)">Previous</a>
-        }
-        <span>Page @_page of @_response.PageCount</span>
-        @if (_page < _response.PageCount)
-        {
-            <a href="receipts?page=@(_page + 1)">Next</a>
-        }
-    </nav>
+@if (_deleting is { } doomed)
+{
+    <ConfirmDialog Title="Delete this receipt?" ConfirmText="Delete receipt" Busy="_busy" OnConfirm="DeleteAsync" OnCancel="CancelDelete">
+        <div class="doomed">
+            <strong>@(doomed.Merchant ?? doomed.OriginalFileName)</strong>@if (doomed.ReceiptDate is { } doomedDate) {<text>, @Format.Date(doomedDate)</text>}@if (doomed.Total is { } doomedTotal) {<text>, <span class="num">@Format.Money(doomedTotal)</span></text>}
+        </div>
+        <p class="muted">
+            The receipt and its picture are removed for good@(doomed.Status == ReceiptStatus.Approved ? ", and totals stop counting it" : "").
+            The record of what was read stays, with nothing linking it back. This can't be undone.
+        </p>
+    </ConfirmDialog>
 }
 
 @code {
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(350);
 
     private readonly CancellationTokenSource _disposed = new();
+    private CancellationTokenSource? _typing;
     private ListReceiptsResponse? _response;
+    private ReceiptFilter _filter = new();
+    private List<(string Value, string Label)> _months = [];
+    private ReceiptListItem? _deleting;
+    private Guid? _menuFor;
     private string? _error;
     private string? _notice;
     private bool _noticeIsError;
-    private Guid? _confirmingDelete;
     private int _page = 1;
     private bool _loading;
     private bool _busy;
+
+    // What the search box shows. It follows the address only when the address was not set by this very box,
+    // so a letter typed while the page reloads is never overwritten.
+    private string _searchShown = string.Empty;
+    private string? _searchNavigatedTo;
 
     // Text, and parsed here: a value such as "abc" cannot be bound to a number, and the binding would throw.
     [SupplyParameterFromQuery(Name = "page")]
     public string? PageText { get; set; }
 
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? SearchText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? StatusText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "month")]
+    public string? MonthText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "category")]
+    public string? CategoryText { get; set; }
+
+    private bool IsFiltered => _filter != new ReceiptFilter();
+
+    private string MonthValue => _filter is { Year: { } year, Month: { } month }
+        ? $"{year:D4}-{month:D2}"
+        : string.Empty;
+
     protected override async Task OnParametersSetAsync()
     {
         _page = int.TryParse(PageText, NumberStyles.None, CultureInfo.InvariantCulture, out var page) && page >= 1 ? page : 1;
+        _filter = ParseFilter();
+        if (_filter.Search != _searchNavigatedTo)
+        {
+            _searchShown = _filter.Search ?? string.Empty;
+        }
+
+        _menuFor = null;
         await LoadAsync();
     }
+
+    // A bad value in the address is the same as none, so a hand-edited link never makes an error page.
+    private ReceiptFilter ParseFilter()
+    {
+        var search = string.IsNullOrWhiteSpace(SearchText) ? null : SearchText.Trim();
+        if (search?.Length > ListReceiptsQuery.MaxSearchLength)
+        {
+            search = search[..ListReceiptsQuery.MaxSearchLength];
+        }
+
+        var status = StatusText?.ToLowerInvariant() switch
+        {
+            "review" => ReceiptStatusFilter.ToReview,
+            "approved" => ReceiptStatusFilter.Approved,
+            "failed" => ReceiptStatusFilter.Failed,
+            _ => ReceiptStatusFilter.All,
+        };
+
+        int? year = null;
+        int? month = null;
+        if (MonthText is { Length: 7 } text
+            && DateOnly.TryParseExact(text + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var first)
+            && first.Year >= 1)
+        {
+            (year, month) = (first.Year, first.Month);
+        }
+
+        ReceiptCategory? category = Enum.TryParse<ReceiptCategory>(CategoryText, ignoreCase: true, out var parsed)
+            && Enum.IsDefined(parsed) && !int.TryParse(CategoryText, out _)
+                ? parsed
+                : null;
+
+        return new ReceiptFilter(search, status, year, month, category);
+    }
+
+    // The address for the same list with one thing changed. Changing a filter goes back to the first page.
+    private string Url(
+        ReceiptStatusFilter? status = null,
+        int? page = null,
+        ReceiptCategory? categoryFilter = null,
+        bool clearCategory = false,
+        string? search = null,
+        string? month = null,
+        bool replaceMonth = false,
+        bool replaceSearch = false)
+    {
+        var shownStatus = status ?? _filter.Status;
+        var shownSearch = replaceSearch ? search : _filter.Search;
+        var shownMonth = replaceMonth ? month : (MonthValue.Length == 0 ? null : MonthValue);
+        var shownCategory = clearCategory ? null : categoryFilter ?? _filter.Category;
+
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(shownSearch))
+        {
+            parts.Add("search=" + Uri.EscapeDataString(shownSearch.Trim()));
+        }
+
+        if (shownStatus != ReceiptStatusFilter.All)
+        {
+            parts.Add("status=" + shownStatus switch
+            {
+                ReceiptStatusFilter.ToReview => "review",
+                ReceiptStatusFilter.Approved => "approved",
+                _ => "failed",
+            });
+        }
+
+        if (!string.IsNullOrEmpty(shownMonth))
+        {
+            parts.Add("month=" + shownMonth);
+        }
+
+        if (shownCategory is { } category)
+        {
+            parts.Add("category=" + Format.Category(category));
+        }
+
+        if (page is > 1)
+        {
+            parts.Add("page=" + page.Value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        return parts.Count == 0 ? "receipts" : "receipts?" + string.Join('&', parts);
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        var text = e.Value?.ToString() ?? string.Empty;
+        _typing?.Cancel();
+        _typing?.Dispose();
+        _typing = CancellationTokenSource.CreateLinkedTokenSource(_disposed.Token);
+        var token = _typing.Token;
+
+        try
+        {
+            await Task.Delay(SearchDelay, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        _searchShown = text;
+        _searchNavigatedTo = string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+        Navigation.NavigateTo(Url(search: text, replaceSearch: true), replace: true);
+    }
+
+    private void OnMonthChanged(ChangeEventArgs e) =>
+        Navigation.NavigateTo(Url(month: e.Value?.ToString(), replaceMonth: true));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -185,7 +395,10 @@ else
         _loading = true;
         try
         {
-            _response = await Sender.Send(new ListReceiptsQuery(_page), _disposed.Token);
+            _response = await Sender.Send(
+                new ListReceiptsQuery(_page, _filter.Search, _filter.Status, _filter.Year, _filter.Month, _filter.Category),
+                _disposed.Token);
+            await LoadMonthsAsync();
             _error = null;
         }
         catch (OperationCanceledException)
@@ -205,8 +418,37 @@ else
         StateHasChanged();
     }
 
+    // The months to pick from run from the first approved receipt to the current month, newest first. A month in the
+    // address that is outside that is added, so the box never shows something other than what is filtered.
+    private async Task LoadMonthsAsync()
+    {
+        var now = Clock.GetLocalNow();
+        var current = new YearMonth(now.Year, now.Month);
+        var totals = await Sender.Send(new GetMonthlyTotalsQuery(current.Year, current.Month), _disposed.Token);
+
+        var first = totals.EarliestMonth is { } earliest && earliest.CompareTo(current) < 0 ? earliest : current;
+        var last = totals.LatestMonth is { } latest && latest.CompareTo(current) > 0 ? latest : current;
+        if (_filter is { Year: { } year, Month: { } month })
+        {
+            var chosen = new YearMonth(year, month);
+            first = chosen.CompareTo(first) < 0 ? chosen : first;
+            last = chosen.CompareTo(last) > 0 ? chosen : last;
+        }
+
+        _months = [];
+        for (var m = last; m.CompareTo(first) >= 0; m = m.AddMonths(-1))
+        {
+            _months.Add(($"{m.Year:D4}-{m.Month:D2}", Format.Month(m.Year, m.Month)));
+        }
+    }
+
+    private void ToggleMenu(Guid id) => _menuFor = _menuFor == id ? null : id;
+
+    private void CloseMenu() => _menuFor = null;
+
     private async Task ReprocessAsync(ReceiptListItem item)
     {
+        _menuFor = null;
         var number = TransactionNumber.Format(item.TransactionNo);
         await RunAsync(
             async () => await Sender.Send(new ReprocessReceiptCommand(item.Id)) switch
@@ -234,14 +476,22 @@ else
             "Could not reprocess the failed receipts. Try again.");
     }
 
-    private void AskDelete(Guid id) => _confirmingDelete = id;
-
-    private void CancelDelete() => _confirmingDelete = null;
-
-    private async Task DeleteAsync(ReceiptListItem item)
+    private void AskDelete(ReceiptListItem item)
     {
+        _menuFor = null;
+        _deleting = item;
+    }
+
+    private void CancelDelete() => _deleting = null;
+
+    private async Task DeleteAsync()
+    {
+        if (_deleting is not { } item)
+        {
+            return;
+        }
+
         var number = TransactionNumber.Format(item.TransactionNo);
-        _confirmingDelete = null;
         await RunAsync(
             async () => await Sender.Send(new DeleteReceiptCommand(item.Id)) switch
             {
@@ -250,6 +500,7 @@ else
                 _ => ($"{number} is still being read, so it cannot be deleted.", true),
             },
             $"Could not delete {number}. Try again.");
+        _deleting = null;
     }
 
     // Runs an action, shows what happened, and reloads the list. An exception shows a short message, never an error page.
@@ -273,22 +524,17 @@ else
         await LoadAsync();
     }
 
-    private static string StatusText(ReceiptStatus status) =>
-        status == ReceiptStatus.ForReview ? "For review" : status.ToString();
-
-    private static string StatusClass(ReceiptStatus status) => status switch
+    private string RangeText()
     {
-        ReceiptStatus.Queued => "text-bg-secondary",
-        ReceiptStatus.Processing => "text-bg-info",
-        ReceiptStatus.ForReview => "text-bg-primary",
-        ReceiptStatus.Failed => "text-bg-danger",
-        ReceiptStatus.Approved => "text-bg-success",
-        _ => "text-bg-light",
-    };
+        var from = ((_page - 1) * ListReceiptsQuery.PageSize) + 1;
+        var to = from + _response!.Items.Count - 1;
+        return $"{from.ToString(CultureInfo.InvariantCulture)}–{to.ToString(CultureInfo.InvariantCulture)} of {_response.TotalCount.ToString(CultureInfo.InvariantCulture)}";
+    }
 
     public void Dispose()
     {
         _disposed.Cancel();
+        _typing?.Dispose();
         _disposed.Dispose();
     }
 }

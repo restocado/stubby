@@ -17,16 +17,60 @@ internal sealed class FakeReceiptRepository : IReceiptRepository
     public Task<long?> FindTransactionNoByChecksumAsync(string checksum, CancellationToken cancellationToken) =>
         Task.FromResult(Receipts.FirstOrDefault(r => r.Checksum == checksum)?.TransactionNo);
 
-    public Task<ReceiptPage> ListAsync(int page, int pageSize, CancellationToken cancellationToken)
+    /// <summary>The filter the last <see cref="ListAsync"/> was called with.</summary>
+    public ReceiptFilter? LastFilter { get; private set; }
+
+    public Task<ReceiptPage> ListAsync(ReceiptFilter filter, int page, int pageSize, CancellationToken cancellationToken)
     {
-        var items = Receipts
+        LastFilter = filter;
+        var matching = Receipts.Where(r => Matches(r, filter)).ToList();
+        var items = matching
             .OrderByDescending(r => r.CreatedAt)
             .ThenByDescending(r => r.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToList();
-        return Task.FromResult(new ReceiptPage(items, Receipts.Count));
+        return Task.FromResult(new ReceiptPage(items, matching.Count));
     }
+
+    private static bool Matches(Receipt receipt, ReceiptFilter filter)
+    {
+        var statusMatches = filter.Status switch
+        {
+            ReceiptStatusFilter.ToReview => receipt.Status == ReceiptStatus.ForReview,
+            ReceiptStatusFilter.Approved => receipt.Status == ReceiptStatus.Approved,
+            ReceiptStatusFilter.Failed => receipt.Status == ReceiptStatus.Failed,
+            _ => true,
+        };
+        var merchant = receipt.Merchant ?? receipt.ExtractedMerchant ?? string.Empty;
+        var searchMatches = string.IsNullOrWhiteSpace(filter.Search)
+            || merchant.Contains(filter.Search, StringComparison.OrdinalIgnoreCase)
+            || receipt.OriginalFileName.Contains(filter.Search, StringComparison.OrdinalIgnoreCase);
+        var date = receipt.ReceiptDate ?? receipt.ExtractedDate;
+        var monthMatches = filter.Year is not { } year || filter.Month is not { } month
+            || (date is { } d && d.Year == year && d.Month == month);
+        var categoryMatches = filter.Category is null || receipt.Category == filter.Category;
+        return statusMatches && searchMatches && monthMatches && categoryMatches;
+    }
+
+    public Task<InboxData> GetInboxAsync(int limit, CancellationToken cancellationToken)
+    {
+        var forReview = Receipts.Where(r => r.Status == ReceiptStatus.ForReview).OrderBy(r => r.CreatedAt).ThenBy(r => r.Id).ToList();
+        var failed = Receipts.Where(r => r.Status == ReceiptStatus.Failed).OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id).ToList();
+        var reading = Receipts.Count(r => r.Status is ReceiptStatus.Queued or ReceiptStatus.Processing);
+        return Task.FromResult(new InboxData(forReview.Take(limit).ToList(), forReview.Count, failed.Take(limit).ToList(), failed.Count, reading));
+    }
+
+    public Task<IReadOnlyList<Guid>> ListForReviewIdsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Receipts
+            .Where(r => r.Status == ReceiptStatus.ForReview)
+            .OrderBy(r => r.CreatedAt)
+            .ThenBy(r => r.Id)
+            .Select(r => r.Id)
+            .ToList());
+
+    public Task<int> CountForReviewAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(Receipts.Count(r => r.Status == ReceiptStatus.ForReview));
 
     public List<FieldRecord> FieldRecords { get; } = [];
 

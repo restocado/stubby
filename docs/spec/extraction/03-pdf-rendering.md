@@ -1,6 +1,6 @@
 # PDF Rendering
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `IPdfRenderer` and `PdfRenderException` in `Application/Abstractions/`. `PdfToImageRenderer` in `Infrastructure/Pdf/`, using PDFtoImage 5.4.0 (MIT, with PDFium and SkiaSharp natives for Windows, Linux and macOS).  
 **Depends on:** nothing.
 

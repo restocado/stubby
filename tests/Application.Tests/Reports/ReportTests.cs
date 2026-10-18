@@ -19,6 +19,16 @@ internal sealed class FakeReportReader : IReportReader
 
     public (int? Year, int? Month)? ListRequestedFor { get; private set; }
 
+    public List<MonthSum> MonthSums { get; } = [];
+
+    public (YearMonth From, YearMonth To)? SumsRequestedFor { get; private set; }
+
+    public Task<IReadOnlyList<MonthSum>> GetMonthlySumsAsync(YearMonth from, YearMonth to, CancellationToken cancellationToken)
+    {
+        SumsRequestedFor = (from, to);
+        return Task.FromResult<IReadOnlyList<MonthSum>>(MonthSums);
+    }
+
     public Task<MonthlyTotalsData> GetMonthlyTotalsAsync(int year, int month, CancellationToken cancellationToken)
     {
         TotalsRequestedFor = (year, month);

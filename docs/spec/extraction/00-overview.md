@@ -1,10 +1,10 @@
 # Extraction Module : Overview
 
-**Status:** Draft
+**Status:** Built
 
 Reading receipts in the background: worker, processing, PDF rendering, extractor, AI gateway and flagging rules.
 
-Follows `docs/architecture.md`: one feature slice per command or query. The AI gateway knows nothing about receipts. The extractor owns the prompt and parsing and sits behind `IReceiptExtractor` in Application, implemented in Infrastructure. Not started.
+Follows `docs/architecture.md`: one feature slice per command or query. The AI gateway knows nothing about receipts. The extractor owns the prompt and parsing and sits behind `IReceiptExtractor` in Application, implemented in Infrastructure.
 
 | File | Contents |
 |---|---|

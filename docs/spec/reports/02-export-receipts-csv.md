@@ -1,6 +1,6 @@
 # Export Receipts CSV
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Application/Features/Reports/ExportReceiptsCsv/`: `ExportReceiptsCsvQuery`, `ExportReceiptsCsvQueryValidator`, `ExportReceiptsCsvQueryHandler`, `ExportReceiptsCsvResponse`, and the internal `ReceiptsCsv` writer. A Mediator query that uses `IReportReader.ListApprovedAsync`. Endpoint in Web (`Web/Endpoints/ReportEndpoints.cs`): `GET /api/reports/receipts.csv`, linked from the monthly totals page.  
 **Depends on:** receipts 01 and 02.
 

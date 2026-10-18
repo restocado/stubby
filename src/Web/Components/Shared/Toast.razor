@@ -1,0 +1,47 @@
+@implements IDisposable
+
+@* A short message that goes away by itself. *@
+<div class="toast" role="status">
+    <span class="toast-icon"><Icon Name="check" Class="small" /></span>
+    <div class="toast-body">@ChildContent</div>
+    <button type="button" class="toast-close" aria-label="Dismiss" @onclick="Close"><Icon Name="x" Class="small" /></button>
+</div>
+
+@code {
+    private readonly CancellationTokenSource _disposed = new();
+
+    [Parameter, EditorRequired]
+    public RenderFragment ChildContent { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public TimeSpan Duration { get; set; } = TimeSpan.FromSeconds(8);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(Duration, _disposed.Token);
+            await Close();
+        }
+        catch (OperationCanceledException)
+        {
+            // The toast was closed or the page left first.
+        }
+    }
+
+    private Task Close() => OnClose.InvokeAsync();
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}

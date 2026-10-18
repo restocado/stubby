@@ -1,0 +1,56 @@
+@using Mediator
+@using Stubby.Application.Features.Receipts.GetReceiptForReview
+@using Stubby.Domain.Receipts
+@inject IMediator Sender
+@inject ILogger<ApprovedToast> Logger
+
+@* Says what was just approved. The id comes from the address, so it is checked: only an approved receipt gets a message. *@
+@if (_receipt is not null)
+{
+    <Toast OnClose="Dismiss">
+        <strong>Approved</strong>
+        @_receipt.Merchant, @Format.Money(_receipt.Total ?? 0m)
+        @if (_receipt.Category is { } category)
+        {
+            <text> as @Format.Category(category)</text>
+        }
+    </Toast>
+}
+
+@code {
+    private ReceiptForReview? _receipt;
+    private Guid? _loadedFor;
+
+    [Parameter]
+    public Guid? ReceiptId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ReceiptId == _loadedFor)
+        {
+            return;
+        }
+
+        _loadedFor = ReceiptId;
+        _receipt = null;
+        if (ReceiptId is not { } id)
+        {
+            return;
+        }
+
+        try
+        {
+            if (await Sender.Send(new GetReceiptForReviewQuery(id)) is GetReceiptForReviewResponse.Found { Receipt.Status: ReceiptStatus.Approved } found)
+            {
+                _receipt = found.Receipt;
+            }
+        }
+        catch (Exception ex)
+        {
+            // A missing message is not worth an error.
+            Logger.LogWarning(ex, "Could not load the approved receipt {Id} for the message.", id);
+        }
+    }
+
+    private void Dismiss() => _receipt = null;
+}

@@ -1,6 +1,6 @@
 # Get Monthly Totals
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Application/Features/Reports/GetMonthlyTotals/`: `GetMonthlyTotalsQuery`, `GetMonthlyTotalsQueryHandler`, `GetMonthlyTotalsQueryValidator`, `GetMonthlyTotalsResponse`. A Mediator query that uses `IReportReader.GetMonthlyTotalsAsync`. Page: `Web/Components/Pages/MonthlyTotals.razor` at `/totals`, with a "Totals" link in the menu.  
 **Depends on:** receipts 01 and 02.
 

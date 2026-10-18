@@ -1,0 +1,29 @@
+@using Stubby.Domain.Receipts
+
+@* One label for a receipt's state. A flagged receipt that is waiting for review says "Check this". *@
+@switch (Status)
+{
+    case ReceiptStatus.Approved:
+        <span class="chip chip-ok"><Icon Name="check" Class="small" />Approved</span>
+        break;
+    case ReceiptStatus.ForReview when IsFlagged:
+        <span class="chip chip-warn"><Icon Name="alert" Class="small" />Check this</span>
+        break;
+    case ReceiptStatus.ForReview:
+        <span class="chip chip-review">To review</span>
+        break;
+    case ReceiptStatus.Failed:
+        <span class="chip chip-fail"><Icon Name="x" Class="small" />Couldn't be read</span>
+        break;
+    default:
+        <span class="chip chip-read"><span class="spinner"></span>Being read</span>
+        break;
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public ReceiptStatus Status { get; set; }
+
+    [Parameter]
+    public bool IsFlagged { get; set; }
+}

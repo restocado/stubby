@@ -62,10 +62,10 @@ public class ReceiptRepositoryTests(PostgresFixture fixture) : PostgresTest(fixt
             await AddQueuedAsync(minutesOld: 60 - i);
         }
 
-        var first = await Repo(r => r.ListAsync(1, 25, Token));
-        var second = await Repo(r => r.ListAsync(2, 25, Token));
-        var third = await Repo(r => r.ListAsync(3, 25, Token));
-        var past = await Repo(r => r.ListAsync(4, 25, Token));
+        var first = await Repo(r => r.ListAsync(new ReceiptFilter(), 1, 25, Token));
+        var second = await Repo(r => r.ListAsync(new ReceiptFilter(), 2, 25, Token));
+        var third = await Repo(r => r.ListAsync(new ReceiptFilter(), 3, 25, Token));
+        var past = await Repo(r => r.ListAsync(new ReceiptFilter(), 4, 25, Token));
 
         Assert.Equal([25, 25, 10, 0], [first.Items.Count, second.Items.Count, third.Items.Count, past.Items.Count]);
         Assert.All([first, second, third, past], page => Assert.Equal(60, page.TotalCount));
@@ -79,7 +79,7 @@ public class ReceiptRepositoryTests(PostgresFixture fixture) : PostgresTest(fixt
     {
         await AddQueuedAsync();
 
-        var page = await Repo(r => r.ListAsync(int.MaxValue, 25, Token));
+        var page = await Repo(r => r.ListAsync(new ReceiptFilter(), int.MaxValue, 25, Token));
 
         Assert.Empty(page.Items);
         Assert.Equal(1, page.TotalCount);

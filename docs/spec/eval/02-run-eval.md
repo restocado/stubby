@@ -1,6 +1,6 @@
 # Run Eval
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Eval/Features/Run/`: `RunEvalCommand`, `RunEvalCommandHandler`, `RunEvalOptions`, `EvalScorer`, `EvalReport`. Uses `IReceiptExtractor` and `ReceiptFlagEvaluator`. Run it from the repository root with `dotnet run --project src/Eval -- run [--testset <folder>] [--report <file>]`.  
 **Depends on:** 01-test-set-generator, extraction 02 and 04.
 

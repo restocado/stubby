@@ -1,7 +1,306 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@implements IDisposable
+@using System.Globalization
+@using Mediator
+@using Stubby.Application.Features.Receipts.GetInbox
+@using Stubby.Application.Features.Receipts.ReprocessReceipt
+@using Stubby.Application.Features.Reports.GetMonthlyTotals
+@using Stubby.Domain.Receipts
+@inject IMediator Sender
+@inject TimeProvider Clock
+@inject ILogger<Home> Logger
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Inbox</PageTitle>
 
-<h1>Hello, world!</h1>
+<header class="page-head">
+    <div>
+        <h1>Inbox</h1>
+        <p>@Summary()</p>
+    </div>
+    @if (_inbox is { ReadingCount: > 0 })
+    {
+        <span class="muted"><span class="live"></span>Updating live</span>
+    }
+</header>
 
-Welcome to your new app.
+@if (_notice is not null)
+{
+    <div class="banner @(_noticeIsError ? "banner-fail" : "banner-ok")" role="status">@_notice</div>
+}
+
+@if (_error is not null)
+{
+    <div class="banner banner-fail" role="alert">@_error</div>
+}
+else if (_inbox is not null)
+{
+    var allClear = _inbox.ForReviewCount == 0 && _inbox.FailedCount == 0 && _inbox.ReadingCount == 0;
+
+    <div class="inbox">
+        <div class="inbox-main">
+            @if (allClear)
+            {
+                <div class="panel empty">
+                    <div class="empty-icon ok"><Icon Name="check" Class="large" /></div>
+                    <h2>You're all caught up</h2>
+                    <p>Nothing to review. New receipts show up here once they are read.</p>
+                    <a class="button primary large" href="upload">Add receipts</a>
+                </div>
+            }
+            else
+            {
+                <div class="tiles">
+                    <div class="panel tile"><strong class="num">@_inbox.ForReviewCount</strong><span class="muted">to review</span></div>
+                    <div class="panel tile"><strong class="num">@_inbox.FailedCount</strong><span class="muted">couldn't be read</span></div>
+                    <div class="panel tile">
+                        <strong class="num">@_inbox.ReadingCount @if (_inbox.ReadingCount > 0) { <span class="spinner"></span> }</strong>
+                        <span class="muted">being read now</span>
+                    </div>
+                </div>
+            }
+
+            @if (_inbox.ForReview.Count > 0)
+            {
+                <a class="button primary large block start-on-phone" href="receipts/@_inbox.ForReview[0].Id">Start reviewing (@_inbox.ForReviewCount)</a>
+
+                <section>
+                    <h2 class="section-title">Needs your review <span>oldest first</span></h2>
+                    @foreach (var item in _inbox.ForReview)
+                    {
+                        <div class="item warn" @key="item.Id">
+                            <div class="item-main">
+                                <div class="item-title">
+                                    @(item.Merchant ?? item.OriginalFileName)
+                                    @if (item.IsPdf)
+                                    {
+                                        <span class="tag">PDF</span>
+                                    }
+                                </div>
+                                <div class="muted">
+                                    @(item.Date is { } date ? Format.Date(date) : "No date found") &middot; @TransactionNumber.Format(item.TransactionNo)
+                                </div>
+                            </div>
+                            @if (item.FlagReasons.Count > 0)
+                            {
+                                <span class="chip chip-warn flag" title="@FlagReasonText.Describe(item.FlagReasons[0])">
+                                    <Icon Name="alert" Class="small" />@FlagReasonText.Short(item.FlagReasons[0])@(item.FlagReasons.Count > 1 ? $" +{item.FlagReasons.Count - 1}" : "")
+                                </span>
+                            }
+                            <div class="amount num">@(item.Total is { } total ? Format.Money(total) : "")</div>
+                            <a class="button primary small" href="receipts/@item.Id">Review</a>
+                        </div>
+                    }
+                    @if (_inbox.ForReviewCount > _inbox.ForReview.Count)
+                    {
+                        <p class="muted">And @(_inbox.ForReviewCount - _inbox.ForReview.Count) more. <a href="receipts?status=review">See them all</a>.</p>
+                    }
+                </section>
+            }
+
+            @if (_inbox.Failed.Count > 0)
+            {
+                <section>
+                    <h2 class="section-title">Couldn't be read</h2>
+                    @foreach (var item in _inbox.Failed)
+                    {
+                        <div class="item fail" @key="item.Id">
+                            <div class="item-main">
+                                <div class="item-title">@item.OriginalFileName</div>
+                                <div class="muted">@(item.Error ?? "Stubby could not read this receipt.") The receipt itself may be fine.</div>
+                            </div>
+                            <button type="button" class="button primary small" disabled="@_busy" @onclick="() => TryAgainAsync(item)">
+                                <Icon Name="refresh" Class="small" />Try again
+                            </button>
+                            <a class="button small" href="receipts/@item.Id?type=1">Type it in</a>
+                        </div>
+                    }
+                </section>
+            }
+
+            @if (_inbox.ReadingCount > 0)
+            {
+                <section>
+                    <h2 class="section-title">Being read</h2>
+                    <div class="item reading">
+                        <span class="spinner"></span>
+                        <div class="item-main muted">
+                            @(_inbox.ReadingCount == 1 ? "1 receipt is" : $"{_inbox.ReadingCount} receipts are") being read. @(_inbox.ReadingCount == 1 ? "It appears" : "They appear") above when ready.
+                        </div>
+                    </div>
+                </section>
+            }
+        </div>
+
+        <aside class="inbox-side">
+            @if (_inbox.ForReview.Count > 0)
+            {
+                <div class="panel padded next-up">
+                    <div class="muted label">Next up</div>
+                    <p>@Format.Receipts(_inbox.ForReviewCount), oldest first.</p>
+                    <a class="button primary large block" href="receipts/@_inbox.ForReview[0].Id">Start reviewing</a>
+                </div>
+            }
+
+            @if (_totals is not null)
+            {
+                var top = _totals.Categories.Where(c => c.Total > 0m).OrderByDescending(c => c.Total).Take(3).ToList();
+                <div class="panel padded">
+                    <div class="between">
+                        <span class="muted label">Approved in @MonthName(_totals)</span>
+                        <a href="totals">See totals &rsaquo;</a>
+                    </div>
+                    <div class="month-total num">@Format.Money(_totals.GrandTotal)</div>
+                    @if (top.Count == 0)
+                    {
+                        <p class="muted">Nothing approved this month yet.</p>
+                    }
+                    else
+                    {
+                        <div class="bars">
+                            @foreach (var category in top)
+                            {
+                                <div>
+                                    <div class="between"><span>@Format.Category(category.Category)</span><span class="num muted">@Format.Money(category.Total)</span></div>
+                                    <div class="bar" style="--col: @Format.CategoryColor(category.Category)"><i style="width: @Percent(category.Total, top[0].Total)%"></i></div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </aside>
+    </div>
+}
+else
+{
+    <p class="muted">Loading...</p>
+}
+
+<ApprovedToast ReceiptId="_approvedId" />
+
+@code {
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(3);
+
+    private readonly CancellationTokenSource _disposed = new();
+    private GetInboxResponse? _inbox;
+    private GetMonthlyTotalsResponse? _totals;
+    private Guid? _approvedId;
+    private string? _error;
+    private string? _notice;
+    private bool _noticeIsError;
+    private bool _loading;
+    private bool _busy;
+
+    // The receipt that was just approved, so the page can say so. It is checked before it is shown.
+    [SupplyParameterFromQuery(Name = "approved")]
+    public string? ApprovedText { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _approvedId = Guid.TryParse(ApprovedText, out var id) ? id : null;
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RefreshWhileReadingAsync();
+        }
+    }
+
+    // Reloads every few seconds, but only while something is still being read.
+    private async Task RefreshWhileReadingAsync()
+    {
+        using var timer = new PeriodicTimer(RefreshInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_disposed.Token))
+            {
+                if (_inbox is { ReadingCount: > 0 } && !_loading)
+                {
+                    await InvokeAsync(LoadAsync);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page was closed.
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _inbox = await Sender.Send(new GetInboxQuery(), _disposed.Token);
+
+            var now = Clock.GetLocalNow();
+            _totals = await Sender.Send(new GetMonthlyTotalsQuery(now.Year, now.Month), _disposed.Token);
+            _error = null;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not load the inbox.");
+            _error = "Could not load the inbox. Try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task TryAgainAsync(InboxItem item)
+    {
+        _busy = true;
+        try
+        {
+            (_notice, _noticeIsError) = await Sender.Send(new ReprocessReceiptCommand(item.Id)) switch
+            {
+                ReprocessReceiptResponse.Requeued => ($"{TransactionNumber.Format(item.TransactionNo)} is back in the queue.", false),
+                ReprocessReceiptResponse.NotFound => ($"{TransactionNumber.Format(item.TransactionNo)} no longer exists.", true),
+                _ => ($"{TransactionNumber.Format(item.TransactionNo)} is no longer failed, so it was not requeued.", true),
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not reprocess {Id}.", item.Id);
+            (_notice, _noticeIsError) = ("Could not try again. Try once more.", true);
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        await LoadAsync();
+    }
+
+    private string Summary() => _inbox switch
+    {
+        null => string.Empty,
+        { ForReviewCount: 0, FailedCount: 0 } => "Nothing is waiting for you.",
+        { ForReviewCount: 0 } => "Nothing to review, but some receipts could not be read.",
+        { ForReviewCount: 1 } => "1 receipt is waiting for you.",
+        _ => $"{_inbox.ForReviewCount} receipts are waiting for you.",
+    };
+
+    private static string MonthName(GetMonthlyTotalsResponse totals) =>
+        new DateTime(totals.Year, totals.Month, 1).ToString("MMMM", CultureInfo.InvariantCulture);
+
+    private static string Percent(decimal value, decimal max) =>
+        (max <= 0m ? 0m : Math.Round(value / max * 100m, 1)).ToString("0.#", CultureInfo.InvariantCulture);
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}

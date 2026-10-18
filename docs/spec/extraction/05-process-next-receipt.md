@@ -1,6 +1,6 @@
 # Process Next Receipt
 
-**Status:** Draft  
+**Status:** Built  
 **Location:** `Application/Features/Extraction/ProcessNextReceipt/`: `ProcessNextReceiptCommand`, `ProcessNextReceiptCommandHandler`, `ProcessNextReceiptResult`. Uses `IReceiptRepository` (`ClaimNextQueuedAsync`, `SaveAsync`), `IImageStore.ReadAsync`, `IReceiptExtractor` and `IExtractionSettings`. Settings `Extraction:MaxAttempts` (1) and `Extraction:FlagTotalLimit` (3000) in `appsettings.json`.  
 **Depends on:** 02-receipt-extractor, 04-flagging-rules, receipts 01 and 02.
 

@@ -1,6 +1,6 @@
 # Reports Module : Test Plan
 
-**Status:** Draft
+**Status:** Built
 
 Scenarios across receipts and reports. Tests use a separate test database.
 
